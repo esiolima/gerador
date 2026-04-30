@@ -38,8 +38,7 @@ body {
 .card {
   width: 700px;
   height: 1057.5px;
-  border: none;
-  box-shadow: inset 0 0 0 6px #F2C94C;
+  border: 6px solid #F2C94C;
   border-radius: 48px;
   background: #ffffff;
   display: flex;
@@ -48,14 +47,14 @@ body {
   padding: 0 20px;
   position: relative;
   color: #1F3C6E;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* ===== SELO ===== */
 .selo {
   position: absolute;
-  top: -6px;
-  left: -6px;
+  top: 10px;
+  left: 10px;
   width: 117px;
   height: 58.5px;
   z-index: 99999;
@@ -72,7 +71,7 @@ body {
 .selo img[src=""] {
   display: none;
 }
-  
+
 /* ===== LOGO ===== */
 .logo {
   margin-top: 45px;
@@ -82,6 +81,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .logo img {
@@ -149,12 +149,13 @@ body {
   margin-bottom: 15px;
   width: 600px;
   height: 190px;
+  min-height: 190px;
   background: #16A7E0;
   border-radius: 20px;
-
   display: grid;
-  grid-template-columns: 85px 1fr;
+  grid-template-columns: 95px minmax(0, 1fr);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 /* LADO ESQUERDO */
@@ -162,13 +163,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .cupom-label span {
-  transform: rotate(-90deg);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
   font-size: 26px;
+  line-height: 1;
   font-weight: 700;
   color: #ffffff;
+  white-space: nowrap;
 }
 
 /* CÓDIGO */
@@ -176,8 +181,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-
-  padding: 0 70px;
+  padding: 0 86px 0 24px;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -187,23 +191,19 @@ body {
 #cupom-text {
   font-weight: 900;
   color: #ffffff;
-
   font-size: 118px;
   line-height: 1;
-
   display: inline-block;
-
   max-width: 100%;
   text-align: center;
-
   white-space: nowrap;
-  padding: 0 10px;
 }
 
 /* ===== RODAPÉ ===== */
 .rodape {
   margin-bottom: 30px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .uf {
@@ -265,29 +265,36 @@ body {
 (function () {
 
   const el = document.getElementById("cupom-text");
-  if (el) {
-    const container = el.parentElement;
+  const container = el ? el.parentElement : null;
 
+  if (el && container) {
     let fontSize = 118;
     const min = 24;
 
     el.style.whiteSpace = "nowrap";
 
-    while ((el.scrollWidth > container.clientWidth - 20) && fontSize > min) {
+    const getAvailableWidth = function () {
+      const styles = window.getComputedStyle(container);
+      const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+      const paddingRight = parseFloat(styles.paddingRight) || 0;
+      return container.clientWidth - paddingLeft - paddingRight - 24;
+    };
+
+    while (el.scrollWidth > getAvailableWidth() && fontSize > min) {
       fontSize--;
       el.style.fontSize = fontSize + "px";
     }
   }
 
-const segmento = document.getElementById("segmento-bloco");
+  const segmento = document.getElementById("segmento-bloco");
 
-if (segmento) {
-  const texto = segmento.textContent?.trim() || "";
+  if (segmento) {
+    const texto = segmento.textContent ? segmento.textContent.trim() : "";
 
-  if (!texto || texto === "NEGÓCIO DE CLIENTES:") {
-    segmento.style.display = "none";
+    if (!texto || texto === "NEGÓCIO DE CLIENTES:") {
+      segmento.style.display = "none";
+    }
   }
-}
 
 })();
 </script>

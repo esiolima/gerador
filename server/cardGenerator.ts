@@ -28,6 +28,7 @@ export type GeneratedCard = {
   pdfUrl: string;
   pngUrl: string;
   htmlUrl: string;
+  html: string;
 };
 
 export type GenerateCardsResult = {
@@ -509,7 +510,10 @@ export class CardGenerator extends EventEmitter {
         pdfUrl: `/output/${jobId}/${pdfName}`,
         pngUrl: `/output/${jobId}/${pngName}`,
         htmlUrl: `/output/${jobId}/${htmlName}`,
-      };
+
+        // 🔥 ESSA LINHA RESOLVE TUDO
+        html
+     };
 
       cards.push(card);
 

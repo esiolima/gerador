@@ -62,13 +62,11 @@ function readImageAsDataUrl(file: File): Promise<string> {
 
 function groupByCategory(cards: GeneratedCard[]) {
   const groups: Record<string, GeneratedCard[]> = {};
-
   cards.forEach((card) => {
     const category = card.categoria?.trim() || "SEM CATEGORIA";
     if (!groups[category]) groups[category] = [];
     groups[category].push(card);
   });
-
   return Object.entries(groups);
 }
 
@@ -203,7 +201,6 @@ export default function CardGenerator() {
     }
 
     const dataUrl = await readImageAsDataUrl(file);
-
     if (kind === "cover") setCoverImage(dataUrl);
     else setAdImage(dataUrl);
   };
@@ -478,82 +475,84 @@ export default function CardGenerator() {
               </div>
             </div>
 
-            <div className="overflow-auto rounded-3xl border border-white/10 bg-black/35 p-6">
-              <div ref={journalRef} className="journal-root">
-                <div className="journal-page-label">Página 1 — Capa</div>
+            <div className="journal-preview-viewport">
+              <div className="journal-preview-scaler">
+                <div ref={journalRef} className="journal-root">
+                  <div className="journal-page-label">Página 1 — Capa</div>
 
-                <div className="journal-page journal-cover" onClick={() => coverInputRef.current?.click()}>
-                  <img src={coverImage} />
-                  <div className="journal-placeholder">
-                    <Pencil className="h-8 w-8" />
-                    Clique para escolher capa 1080x1920
-                  </div>
-                </div>
-
-                <div className="journal-page-label">Página 2 — Cards</div>
-
-                <div className="journal-flow-page" style={{ background: pageBackground }}>
-                  <div className="journal-header">
-                    <img src="/assets/header.png" />
-                    <span>Cabeçalho 2400x578</span>
+                  <div className="journal-page journal-cover" onClick={() => coverInputRef.current?.click()}>
+                    <img src={coverImage} />
+                    <div className="journal-placeholder">
+                      <Pencil className="h-8 w-8" />
+                      Clique para escolher capa
+                    </div>
                   </div>
 
-                  {groupedCards.map(([category, cards]) => (
-                    <section className="journal-category" key={category}>
-                      <div className="journal-category-bar">{category}</div>
+                  <div className="journal-page-label">Página 2 — Cards</div>
 
-                      <div className="journal-grid">
-                        {cards.map((card) => {
-                          const cardKey = `${card.ordem}-${card.htmlName}`;
-                          const logoOverride = logoOverrides[cardKey];
+                  <div className="journal-flow-page" style={{ background: pageBackground }}>
+                    <div className="journal-header">
+                      <img src="/assets/header.png" />
+                      <span>Cabeçalho</span>
+                    </div>
 
-                          return (
-                            <div className="journal-card-wrap" key={cardKey}>
-                              <iframe
-                                title={cardKey}
-                                src={card.htmlUrl}
-                                className="journal-card-frame"
-                              />
+                    {groupedCards.map(([category, cards]) => (
+                      <section className="journal-category" key={category}>
+                        <div className="journal-category-bar">{category}</div>
 
-                              <button
-                                type="button"
-                                className={`journal-logo-hotspot ${
-                                  logoOverride || card.hasLogo ? "has-logo-override" : ""
-                                }`}
-                                onClick={() => openLogoPicker(cardKey)}
-                              >
-                                {logoOverride ? (
-                                  <img src={logoOverride} alt="Logo substituído" />
-                                ) : card.hasLogo ? (
-                                  <span>Trocar logo</span>
-                                ) : (
-                                  <span>Adicionar logo</span>
-                                )}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
+                        <div className="journal-grid">
+                          {cards.map((card) => {
+                            const cardKey = `${card.ordem}-${card.htmlName}`;
+                            const logoOverride = logoOverrides[cardKey];
 
-                  <div
-                    className="journal-footer-text"
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => setFooterText(e.currentTarget.innerText)}
-                  >
-                    {footerText}
+                            return (
+                              <div className="journal-card-wrap" key={cardKey}>
+                                <iframe
+                                  title={cardKey}
+                                  src={card.htmlUrl}
+                                  className="journal-card-frame"
+                                />
+
+                                <button
+                                  type="button"
+                                  className={`journal-logo-hotspot ${
+                                    logoOverride || card.hasLogo ? "has-logo-override" : ""
+                                  }`}
+                                  onClick={() => openLogoPicker(cardKey)}
+                                >
+                                  {logoOverride ? (
+                                    <img src={logoOverride} alt="Logo substituído" />
+                                  ) : card.hasLogo ? (
+                                    <span>Trocar logo</span>
+                                  ) : (
+                                    <span>Adicionar logo</span>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))}
+
+                    <div
+                      className="journal-footer-text"
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) => setFooterText(e.currentTarget.innerText)}
+                    >
+                      {footerText}
+                    </div>
                   </div>
-                </div>
 
-                <div className="journal-page-label">Página 3 — Anúncio</div>
+                  <div className="journal-page-label">Página 3 — Anúncio</div>
 
-                <div className="journal-page journal-cover" onClick={() => adInputRef.current?.click()}>
-                  <img src={adImage} />
-                  <div className="journal-placeholder">
-                    <Pencil className="h-8 w-8" />
-                    Clique para escolher anúncio 1080x1920
+                  <div className="journal-page journal-cover" onClick={() => adInputRef.current?.click()}>
+                    <img src={adImage} />
+                    <div className="journal-placeholder">
+                      <Pencil className="h-8 w-8" />
+                      Clique para escolher anúncio
+                    </div>
                   </div>
                 </div>
               </div>
@@ -592,12 +591,36 @@ export default function CardGenerator() {
 }
 
 const journalCss = `
+  .journal-preview-viewport{
+    width:100%;
+    max-height:82vh;
+    overflow:auto;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    background:#020817;
+    padding:24px;
+    border-radius:24px;
+    border:1px solid rgba(255,255,255,.10);
+  }
+
+  .journal-preview-scaler{
+    width:672px;
+    height:auto;
+    min-height:1200px;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    flex-shrink:0;
+  }
+
   .journal-root{
     width:2400px;
     margin:0 auto;
     background:#eef4ff;
     color:#111;
     font-family:Inter,Arial,sans-serif;
+    transform:scale(.28);
     transform-origin:top center;
   }
 
@@ -797,17 +820,6 @@ const journalCss = `
   @media print{
     .journal-page-label{
       display:none;
-    }
-  }
-
-  @media screen and (max-width:1200px){
-    .journal-root{
-      transform:scale(.42);
-      margin-bottom:-58%;
-    }
-
-    .journal-placeholder{
-      font-size:36px;
     }
   }
 `;

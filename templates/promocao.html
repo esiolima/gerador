@@ -1,5 +1,3 @@
-<!-- templates/promocao.html CORRIGIDO -->
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -10,16 +8,17 @@
 <style>
 @font-face {
   font-family: 'Inter';
-  src: url('../fonts/Inter-Regular.ttf');
+  src: url('../fonts/Inter-Regular.ttf') format('truetype');
+  font-weight: 400;
 }
 @font-face {
   font-family: 'Inter';
-  src: url('../fonts/Inter-Bold.ttf');
+  src: url('../fonts/Inter-Bold.ttf') format('truetype');
   font-weight: 700;
 }
 @font-face {
   font-family: 'Inter';
-  src: url('../fonts/Inter-Black.ttf');
+  src: url('../fonts/Inter-Black.ttf') format('truetype');
   font-weight: 900;
 }
 
@@ -34,95 +33,167 @@ body {
   margin: 0;
   width: 700px;
   height: 1058px;
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* CARD */
 .card {
   width: 700px;
   height: 1058px;
   border: 8px solid #e0b84b;
   border-radius: 40px;
-  padding: 70px 40px 40px 40px;
+  padding: 60px 40px 38px 40px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background: #fff;
+  background: #ffffff;
   overflow: hidden;
+  position: relative;
 }
 
-/* TOPO */
+/* ===== SELO DINÂMICO ===== */
+.selo {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 130px;
+  height: 65px;
+  background: transparent;
+  display: none;
+  z-index: 999;
+}
+
+.selo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ===== TOPO ===== */
 .topo {
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
+.logo {
+  width: 100%;
+  height: 130px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .logo img {
-  max-width: 220px;
-  max-height: 120px;
+  max-width: 260px;
+  max-height: 130px;
+  object-fit: contain;
+}
+
+.logo img[src=""] {
+  display: none;
+}
+
+.logo:has(img[src=""])::before,
+.logo:not(:has(img))::before {
+  content: "CLIQUE PARA ADICIONAR LOGO";
+  font-size: 18px;
+  color: #999;
+  border: 2px dashed #ccc;
+  padding: 20px 40px;
+  border-radius: 12px;
 }
 
 .tarja {
   background: #ff7a00;
-  color: #fff;
-  padding: 20px 70px;
+  color: #ffffff;
+  padding: 18px 70px;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 54px;
+  font-size: 52px;
+  text-align: center;
+  white-space: nowrap;
 }
 
-/* TEXTO */
+/* ===== BLOCO CENTRAL ===== */
+.bloco-central {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .texto-topo {
   text-align: center;
   font-size: 28px;
   max-width: 550px;
-  margin: 25px 0 20px;
+  line-height: 1.15;
+  margin: 24px 0 16px;
+  word-break: break-word;
 }
 
-/* VALOR */
+/* ===== VALOR PROMOÇÃO ===== */
 .valor-container {
   width: 100%;
   height: 360px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .valor-texto {
   font-weight: 900;
   font-size: 480px;
   text-align: center;
-
-  white-space: normal;      /* permite quebrar linha */
-  word-break: keep-all;     /* nunca quebra palavra */
+  white-space: normal;
+  word-break: keep-all;
   overflow-wrap: normal;
-
   line-height: 0.9;
 }
 
-/* INFERIOR */
+/* ===== INFERIOR ===== */
+.bloco-inferior {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .complemento {
   text-align: center;
   font-size: 22px;
   max-width: 550px;
+  line-height: 1.15;
+  word-break: break-word;
 }
 
 .legal {
+  margin-top: 10px;
   text-align: center;
   font-size: 18px;
   max-width: 550px;
+  line-height: 1.15;
+  word-break: break-word;
 }
 
 .rodape {
+  margin-top: 18px;
   text-align: center;
+}
+
+.uf {
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .segmento-wrapper {
   margin-top: 10px;
   font-size: 18px;
+  font-weight: 400;
 }
 </style>
 </head>
@@ -131,15 +202,19 @@ body {
 
 <div class="card">
 
+  <div class="selo" id="selo-container">
+    <img id="selo-img" alt="Selo" />
+  </div>
+
   <div class="topo">
     <div class="logo">
-      <img src="{{LOGO}}">
+      <img src="{{LOGO}}" alt="Logo" />
     </div>
 
     <div class="tarja">PROMOÇÃO</div>
   </div>
 
-  <div>
+  <div class="bloco-central">
     <div class="texto-topo">{{TEXTO}}</div>
 
     <div class="valor-container" id="valor-container">
@@ -149,13 +224,13 @@ body {
     </div>
   </div>
 
-  <div>
+  <div class="bloco-inferior">
     <div class="complemento">{{COMPLEMENTO}}</div>
     <div class="legal">{{LEGAL}}</div>
 
     <div class="rodape">
-      <div>{{URN}}</div>
-      <div>{{UF}}</div>
+      <div class="uf">{{URN}}</div>
+      <div class="uf">{{UF}}</div>
 
       <div class="segmento-wrapper" id="segmento-bloco">
         NEGOCIO DE CLIENTES: {{SEGMENTO}}
@@ -167,26 +242,43 @@ body {
 
 <script>
 (function () {
-
   const container = document.getElementById("valor-container");
   const el = document.getElementById("valor-texto");
 
-  if (!container || !el) return;
+  if (container && el) {
+    let fontSize = 480;
+    const min = 40;
 
-  let fontSize = 480;
-  const min = 40;
-
-  el.style.fontSize = fontSize + "px";
-
-  while (
-    (el.scrollHeight > container.clientHeight ||
-     el.scrollWidth > container.clientWidth) &&
-    fontSize > min
-  ) {
-    fontSize -= 2;
     el.style.fontSize = fontSize + "px";
+    el.style.whiteSpace = "normal";
+    el.style.wordBreak = "keep-all";
+    el.style.overflowWrap = "normal";
+
+    while (
+      (el.scrollHeight > container.clientHeight ||
+       el.scrollWidth > container.clientWidth) &&
+      fontSize > min
+    ) {
+      fontSize -= 2;
+      el.style.fontSize = fontSize + "px";
+    }
   }
 
+  const segmento = document.getElementById("segmento-bloco");
+  const valorSegmento = "{{SEGMENTO}}".trim();
+
+  if (!valorSegmento && segmento) {
+    segmento.style.display = "none";
+  }
+
+  const seloContainer = document.getElementById("selo-container");
+  const seloImg = document.getElementById("selo-img");
+  const valorSelo = "{{SELO}}".trim();
+
+  if (valorSelo && seloContainer && seloImg) {
+    seloImg.src = valorSelo;
+    seloContainer.style.display = "block";
+  }
 })();
 </script>
 

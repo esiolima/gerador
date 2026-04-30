@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Jornal | Grid 3 Colunas</title>
+  <!-- Inter via Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1F3C6E;
+      --accent:  #E0B84B;
+      --font:    'Inter', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: #f0f2f5;
+      margin: 0;
+    }
+
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 40px;
+      text-align: center;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    header h1 { margin: 0 0 8px; font-size: 28px; }
+    header p  { margin: 0; opacity: .8; font-size: 15px; }
+
+    .ui-box {
+      max-width: 800px;
+      margin: -30px auto 30px;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      text-align: center;
+    }
+
+    input[type="file"] {
+      margin-bottom: 15px;
+      font-family: var(--font);
+    }
+
+    .btn-gerar {
+      background: var(--accent);
+      color: var(--primary);
+      border: none;
+      padding: 15px 30px;
+      font-family: var(--font);
+      font-weight: 700;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: opacity .2s;
+    }
+    .btn-gerar:hover { opacity: .85; }
+
+    .btn-export {
+      background: #1a7d00;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      font-family: var(--font);
+      font-weight: 700;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 15px;
+      transition: opacity .2s;
+    }
+    .btn-export:hover { opacity: .85; }
+
+    /* Área de preview: scroll horizontal caso jornal seja maior que viewport */
+    #jornal {
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    #jornal-preview {
+      display: inline-block; /* deixa o preview respeitar a largura do jornal */
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Gerador de Jornal em Grid</h1>
+    <p>Organização automática em 3 colunas · 1080 px · ordenado pela coluna <strong>"ordem farma"</strong></p>
+  </header>
+
+  <div class="ui-box">
+    <input type="file" id="upload" accept=".xlsx" />
+    <br>
+    <button class="btn-gerar" onclick="processarPlanilha()">GERAR JORNAL EM GRID</button>
+  </div>
+
+  <div id="jornal"></div>
+
+  <!-- SheetJS para leitura do .xlsx -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+
+</body>
+</html>

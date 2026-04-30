@@ -1,0 +1,35 @@
+/* ======================================================
+   JORNAL DE OFERTAS — style.css
+   Fonte Inter via Google Fonts
+   Layout 1080px, grid 3 colunas
+   ====================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+:root {
+  --primary: #1F3C6E;
+  --accent:  #E0B84B;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f0f2f5;
+  margin: 0;
+  padding: 20px;
+}
+
+/* Área do jornal — permite scroll horizontal em telas menores que 1080px */
+#jornal {
+  overflow-x: auto;
+}
+
+/* O preview fica inline para que o scroll funcione corretamente */
+#jornal-preview {
+  display: inline-block;
+}

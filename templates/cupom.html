@@ -146,12 +146,12 @@ body {
   margin-top: 24px;
   margin-bottom: 15px;
   width: 600px;
-  height: 165px;
+  height: 190px;
   background: #16A7E0;
   border-radius: 20px;
 
   display: grid;
-  grid-template-columns: 70px 1fr;
+  grid-template-columns: 85px 1fr;
   overflow: hidden;
 }
 
@@ -175,7 +175,7 @@ body {
   align-items: center;
   justify-content: center;
 
-  padding: 0 54px;
+  padding: 0 70px;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -195,6 +195,7 @@ body {
   text-align: center;
 
   white-space: nowrap;
+  padding: 0 10px;
 }
 
 /* ===== RODAPÉ ===== */
@@ -271,7 +272,7 @@ body {
 
   el.style.whiteSpace = "nowrap";
 
-  while (el.scrollWidth > container.clientWidth && fontSize > min) {
+  while ((el.scrollWidth > container.clientWidth - 20) && fontSize > min) {
     fontSize--;
     el.style.fontSize = fontSize + "px";
   }

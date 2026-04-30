@@ -25,16 +25,18 @@ export const cardRouter = router({
           message: "Arquivo não encontrado",
         });
       }
-      if (!filePath.endsWith(".xlsx")) {
+
+      if (!filePath.toLowerCase().endsWith(".xlsx")) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Apenas arquivos .xlsx são suportados",
         });
       }
 
+      const generator = new CardGenerator();
+      activeGenerators.set(sessionId, generator);
+
       try {
-        const generator = new CardGenerator();
-        activeGenerators.set(sessionId, generator);
         await generator.initialize();
 
         generator.on("progress", (progress) => {
@@ -43,21 +45,25 @@ export const cardRouter = router({
 
         const result = await generator.generateCards(filePath, originalFileName);
 
-        await generator.close();
-        activeGenerators.delete(sessionId);
-
         return {
           success: true,
-          ...result,
+          zipPath: result.zipPath,
+          zipName: result.zipName,
           fileName: path.basename(result.zipPath),
+          jobId: result.jobId,
+          cards: result.cards,
+          totalRows: result.totalRows,
+          processedRows: result.processedRows,
         };
       } catch (error) {
-        activeGenerators.delete(sessionId);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message:
             error instanceof Error ? error.message : "Erro ao processar cards",
         });
+      } finally {
+        await generator.close().catch(() => {});
+        activeGenerators.delete(sessionId);
       }
     }),
 

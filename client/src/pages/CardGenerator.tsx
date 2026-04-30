@@ -762,12 +762,12 @@ const journalCss = `
   }
 
   .journal-grid{
-    display:grid;
-    grid-template-columns:repeat(3, 700px);
-    gap:70px;
-    justify-content:center;
-    padding:30px 80px 70px 80px;
-    box-sizing:border-box;
+   display:flex;
+   flex-wrap:wrap;
+   gap:70px;
+   justify-content:center;
+   padding:30px 80px 70px 80px;
+   box-sizing:border-box;
   }
 
   .journal-card-wrap{

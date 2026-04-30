@@ -6,7 +6,6 @@
 <title>Cashback</title>
 
 <style>
-
 @font-face {
   font-family: 'Inter';
   src: url('../fonts/Inter-Regular.ttf') format('truetype');
@@ -46,11 +45,11 @@ body {
   border: 8px solid #e0b84b;
   border-radius: 40px;
   background: #ffffff;
-  padding: 60px 40px 40px 40px;
+  padding: 55px 40px 38px 40px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  overflow: visible; /* permite selo ultrapassar */
+  overflow: hidden;
   position: relative;
 }
 
@@ -73,7 +72,7 @@ body {
   display: block;
 }
 
-/* TOPO */
+/* ===== TOPO ===== */
 .topo {
   display: flex;
   flex-direction: column;
@@ -81,11 +80,33 @@ body {
 }
 
 .logo {
-  margin-bottom: 20px;
+  width: 100%;
+  height: 140px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
+
 .logo img {
-  max-width: 240px;
-  max-height: 120px;
+  max-width: 280px;
+  max-height: 140px;
+  object-fit: contain;
+}
+
+.logo img[src=""] {
+  display: none;
+}
+
+.logo:has(img[src=""])::before,
+.logo:not(:has(img))::before {
+  content: "CLIQUE PARA ADICIONAR LOGO";
+  font-size: 18px;
+  color: #999;
+  border: 2px dashed #ccc;
+  padding: 20px 40px;
+  border-radius: 12px;
 }
 
 .tarja {
@@ -96,47 +117,54 @@ body {
   text-align: center;
   padding: 18px 40px;
   border-radius: 999px;
-  margin-bottom: 30px;
+  margin-bottom: 22px;
   white-space: nowrap;
 }
 
-/* BLOCO CENTRAL */
+/* ===== BLOCO CENTRAL ===== */
 .area-central {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 25px;
+  gap: 18px;
 }
 
 .texto-topo {
   font-size: 26px;
-  line-height: 1.2;
+  line-height: 1.18;
   max-width: 560px;
   text-align: center;
   word-break: break-word;
 }
 
+/* ===== VALOR GRANDE + AUTO AJUSTE ===== */
 .valor-container {
+  width: 100%;
+  height: 245px;
   display: flex;
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
+  overflow: hidden;
 }
 
 .valor-texto {
   font-weight: 900;
-  font-size: clamp(140px, 22vw, 260px);
-  line-height: 1;
+  font-size: 270px;
+  line-height: 0.9;
   white-space: nowrap;
+  text-align: center;
+  display: inline-block;
 }
 
 .desconto {
-  font-size: 44px;
+  font-size: 46px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .complemento {
   font-size: 24px;
-  line-height: 1.2;
+  line-height: 1.15;
   max-width: 560px;
   text-align: center;
   word-break: break-word;
@@ -144,15 +172,16 @@ body {
 
 .legal {
   font-size: 18px;
-  line-height: 1.2;
+  line-height: 1.15;
   max-width: 560px;
   text-align: center;
   word-break: break-word;
 }
 
-/* RODAPÉ */
+/* ===== RODAPÉ ===== */
 .rodape {
   text-align: center;
+  margin-bottom: 8px;
 }
 
 .uf {
@@ -165,7 +194,6 @@ body {
   font-size: 18px;
   font-weight: 400;
 }
-
 </style>
 </head>
 
@@ -173,14 +201,13 @@ body {
 
 <div class="card">
 
-  <!-- SELO DINÂMICO -->
   <div class="selo" id="selo-container">
-    <img id="selo-img" />
+    <img id="selo-img" alt="Selo" />
   </div>
 
   <div class="topo">
     <div class="logo">
-      <img src="{{LOGO}}" />
+      <img src="{{LOGO}}" alt="Logo" />
     </div>
 
     <div class="tarja">
@@ -194,8 +221,8 @@ body {
       {{TEXTO}}
     </div>
 
-    <div class="valor-container">
-      <div class="valor-texto">
+    <div class="valor-container" id="valor-container">
+      <div class="valor-texto" id="valor-texto">
         {{VALOR}}%
       </div>
     </div>
@@ -228,7 +255,26 @@ body {
 <script>
 window.addEventListener("load", function () {
 
-  /* ===== SEGMENTO ===== */
+  const container = document.getElementById("valor-container");
+  const valor = document.getElementById("valor-texto");
+
+  if (container && valor) {
+    let fontSize = 270;
+    const minFontSize = 90;
+
+    valor.style.fontSize = fontSize + "px";
+    valor.style.whiteSpace = "nowrap";
+
+    while (
+      (valor.scrollWidth > container.clientWidth ||
+       valor.scrollHeight > container.clientHeight) &&
+      fontSize > minFontSize
+    ) {
+      fontSize -= 2;
+      valor.style.fontSize = fontSize + "px";
+    }
+  }
+
   const segmento = document.getElementById("segmento-bloco");
   const valorSegmento = "{{SEGMENTO}}".trim();
 
@@ -236,12 +282,11 @@ window.addEventListener("load", function () {
     segmento.style.display = "none";
   }
 
-  /* ===== SELO ===== */
   const seloContainer = document.getElementById("selo-container");
   const seloImg = document.getElementById("selo-img");
   const valorSelo = "{{SELO}}".trim();
 
-  if (valorSelo) {
+  if (valorSelo && seloContainer && seloImg) {
     seloImg.src = valorSelo;
     seloContainer.style.display = "block";
   }

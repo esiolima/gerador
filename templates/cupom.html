@@ -50,10 +50,10 @@ body {
   overflow: hidden;
 }
 
-/* ===== LOGO (EDITÁVEL) ===== */
+/* ===== LOGO (MAIOR AGORA) ===== */
 .logo {
-  margin-top: 60px;
-  height: 154px;
+  margin-top: 45px;
+  height: 190px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -62,12 +62,11 @@ body {
 }
 
 .logo img {
-  max-height: 154px;
-  max-width: 520px;
+  max-height: 190px;
+  max-width: 560px;
   object-fit: contain;
 }
 
-/* estado sem logo */
 .logo img[src=""] {
   display: none;
 }
@@ -82,10 +81,10 @@ body {
   border-radius: 12px;
 }
 
-/* ===== TEXTO ===== */
+/* ===== TEXTO (AJUSTADO) ===== */
 .condicao {
-  margin-top: 35px;
-  margin-bottom: 60px;
+  margin-top: 20px;
+  margin-bottom: 25px;
   max-width: 550px;
   font-size: 28px;
   line-height: 1.15;
@@ -108,7 +107,7 @@ body {
 .percent { margin-left: 6px; }
 
 .desconto {
-  margin-top: 10px;
+  margin-top: 5px;
   font-size: clamp(40px, 5vw, 60px);
   font-weight: 700;
 }
@@ -121,12 +120,12 @@ body {
   justify-content: center;
 }
 
-/* ===== CUPOM BOX ===== */
+/* ===== CUPOM BOX (MAIOR) ===== */
 .cupom-box {
-  margin-top: 30px;
+  margin-top: 24px;
   margin-bottom: 15px;
   width: 600px;
-  height: 140px;
+  height: 165px;
   background: #16A7E0;
   border-radius: 20px;
 
@@ -144,7 +143,7 @@ body {
 
 .cupom-label span {
   transform: rotate(-90deg);
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   color: #ffffff;
 }
@@ -155,7 +154,7 @@ body {
   align-items: center;
   justify-content: center;
 
-  padding: 0 40px; /* 🔥 AUMENTAMOS A MARGEM */
+  padding: 0 54px;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -166,7 +165,7 @@ body {
   font-weight: 900;
   color: #ffffff;
 
-  font-size: 110px;
+  font-size: 118px;
   line-height: 1;
 
   display: inline-block;
@@ -242,7 +241,7 @@ body {
 
   const container = el.parentElement;
 
-  let fontSize = 110;
+  let fontSize = 118;
   const min = 24;
 
   el.style.whiteSpace = "nowrap";

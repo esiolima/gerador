@@ -1,5 +1,3 @@
-<!-- templates/cupom.html CORRIGIDO -->
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -52,19 +50,36 @@ body {
   overflow: hidden;
 }
 
-/* ===== LOGO ===== */
+/* ===== LOGO (EDITÁVEL) ===== */
 .logo {
   margin-top: 60px;
   height: 154px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 .logo img {
   max-height: 154px;
   max-width: 520px;
   object-fit: contain;
+}
+
+/* estado sem logo */
+.logo img[src=""] {
+  display: none;
+}
+
+.logo:has(img[src=""])::before,
+.logo:not(:has(img))::before {
+  content: "CLIQUE PARA ADICIONAR LOGO";
+  font-size: 18px;
+  color: #999;
+  border: 2px dashed #ccc;
+  padding: 20px 40px;
+  border-radius: 12px;
 }
 
 /* ===== TEXTO ===== */
@@ -116,7 +131,8 @@ body {
   border-radius: 20px;
 
   display: grid;
-  grid-template-columns: 70px 1fr; /* MENOR espaço lateral */
+  grid-template-columns: 70px 1fr;
+  overflow: hidden;
 }
 
 /* LADO ESQUERDO */
@@ -139,11 +155,13 @@ body {
   align-items: center;
   justify-content: center;
 
-  padding: 0 20px; /* 👈 MARGEM INTERNA */
+  padding: 0 40px; /* 🔥 AUMENTAMOS A MARGEM */
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
+/* TEXTO DO CUPOM */
 #cupom-text {
   font-weight: 900;
   color: #ffffff;
@@ -151,8 +169,12 @@ body {
   font-size: 110px;
   line-height: 1;
 
-  white-space: nowrap;
   display: inline-block;
+
+  max-width: 100%;
+  text-align: center;
+
+  white-space: nowrap;
 }
 
 /* ===== RODAPÉ ===== */
@@ -216,13 +238,12 @@ body {
 (function () {
 
   const el = document.getElementById("cupom-text");
-
   if (!el) return;
 
   const container = el.parentElement;
 
   let fontSize = 110;
-  const min = 20;
+  const min = 24;
 
   el.style.whiteSpace = "nowrap";
 

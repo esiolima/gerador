@@ -38,7 +38,8 @@ body {
 .card {
   width: 700px;
   height: 1057.5px;
-  border: 6px solid #F2C94C;
+  border: none;
+  box-shadow: inset 0 0 0 6px #F2C94C;
   border-radius: 48px;
   background: #ffffff;
   display: flex;
@@ -278,12 +279,15 @@ body {
     }
   }
 
-  const segmento = document.getElementById("segmento-bloco");
-  const valorSegmento = "{{SEGMENTO}}".trim();
+const segmento = document.getElementById("segmento-bloco");
 
-  if (!valorSegmento && segmento) {
+if (segmento) {
+  const texto = segmento.textContent?.trim() || "";
+
+  if (!texto || texto === "NEGÓCIO DE CLIENTES:") {
     segmento.style.display = "none";
   }
+}
 
 })();
 </script>

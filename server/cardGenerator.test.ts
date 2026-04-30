@@ -54,20 +54,15 @@ export class CardGenerator extends EventEmitter {
     return `data:image/${ext};base64,${buffer.toString("base64")}`;
   }
 
-  async generateCards(excelFilePath: string): Promise<string> {
+  async generateCards(excelFilePath: string) {
     if (!this.browser) throw new Error("Browser not initialized");
-
-    fs.readdirSync(OUTPUT_DIR).forEach((file) => {
-      if (file.endsWith(".pdf") || file.endsWith(".zip")) {
-        fs.unlinkSync(path.join(OUTPUT_DIR, file));
-      }
-    });
 
     const workbook = xlsx.readFile(excelFilePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: any[] = xlsx.utils.sheet_to_json(sheet, { defval: "" });
 
-    const total = rows.length;
+    const cards: any[] = [];
+
     let processed = 0;
 
     for (const row of rows) {
@@ -79,53 +74,27 @@ export class CardGenerator extends EventEmitter {
 
       let html = fs.readFileSync(templatePath, "utf8");
 
-      // ================================
-      // REGRA INTELIGENTE DO VALOR
-      // ================================
       let valorFinal = String(row.valor ?? "").trim();
 
-      if (tipo === "promocao") {
-        // mantém exatamente como está
-        valorFinal = valorFinal;
-      }
-
       if (["cupom", "queda", "bc"].includes(tipo)) {
-
-        // mantém apenas números e vírgula
         valorFinal = valorFinal.replace(/[^0-9,]/g, "");
 
-        // mantém apenas a primeira vírgula
         const partes = valorFinal.split(",");
         if (partes.length > 2) {
           valorFinal = partes[0] + "," + partes.slice(1).join("");
         }
 
-        // remove vírgula no início
-        if (valorFinal.startsWith(",")) {
-          valorFinal = valorFinal.substring(1);
-        }
-
-        // remove vírgula no final
-        if (valorFinal.endsWith(",")) {
-          valorFinal = valorFinal.slice(0, -1);
-        }
+        if (valorFinal.startsWith(",")) valorFinal = valorFinal.substring(1);
+        if (valorFinal.endsWith(",")) valorFinal = valorFinal.slice(0, -1);
       }
 
-      // ================================
-      // LOGO PADRÃO
-      // ================================
-      let logoFile =
-        row.logo && String(row.logo).trim() !== ""
-          ? String(row.logo).trim()
-          : "blank.png";
+      const hasLogo = !!(row.logo && String(row.logo).trim() !== "");
 
-      const logoBase64 = this.imageToBase64(
-        path.join(LOGOS_DIR, logoFile)
-      );
+      const logoFile = hasLogo ? String(row.logo).trim() : "";
+      const logoBase64 = logoFile
+        ? this.imageToBase64(path.join(LOGOS_DIR, logoFile))
+        : "";
 
-      // ================================
-      // SELO
-      // ================================
       const seloBase64 = row.selo
         ? this.imageToBase64(
             path.join(
@@ -151,6 +120,10 @@ export class CardGenerator extends EventEmitter {
         .replaceAll("{{LOGO}}", logoBase64)
         .replaceAll("{{SELO}}", seloBase64);
 
+      // ============================
+      // GERAR PDF (continua igual)
+      // ============================
+
       const tmpHtmlPath = path.join(TMP_DIR, `card_${processed + 1}.html`);
       fs.writeFileSync(tmpHtmlPath, html);
 
@@ -174,12 +147,24 @@ export class CardGenerator extends EventEmitter {
 
       await page.close();
 
+      // ============================
+      // 🔥 NOVO: ENVIAR HTML PRO FRONT
+      // ============================
+
+      cards.push({
+        ordem,
+        tipo,
+        categoria: String(row.categoria ?? ""),
+        html,
+        hasLogo,
+      });
+
       processed++;
 
       this.emit("progress", {
         processed,
-        total,
-        percentage: Math.round((processed / total) * 100),
+        total: rows.length,
+        percentage: Math.round((processed / rows.length) * 100),
       });
     }
 
@@ -197,7 +182,12 @@ export class CardGenerator extends EventEmitter {
 
     await archive.finalize();
 
-    return zipPath;
+    return {
+      zipPath,
+      cards,
+      totalRows: rows.length,
+      processedRows: processed,
+    };
   }
 
   async close() {

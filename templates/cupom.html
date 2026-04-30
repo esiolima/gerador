@@ -47,17 +47,18 @@ body {
   padding: 0 20px;
   position: relative;
   color: #1F3C6E;
-  overflow: hidden;
+  overflow: visible;
 }
 
-  /* ===== SELO ===== */
+/* ===== SELO ===== */
 .selo {
   position: absolute;
   top: -6px;
   left: -6px;
-  width: 130px;
-  height: 65px;
-  z-index: 999;
+  width: 117px;
+  height: 58.5px;
+  z-index: 99999;
+  pointer-events: none;
 }
 
 .selo img {
@@ -71,10 +72,10 @@ body {
   display: none;
 }
   
-/* ===== LOGO (MAIOR AGORA) ===== */
+/* ===== LOGO ===== */
 .logo {
   margin-top: 45px;
-  height: 190px;
+  height: 228px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -83,8 +84,8 @@ body {
 }
 
 .logo img {
-  max-height: 190px;
-  max-width: 560px;
+  max-height: 228px;
+  max-width: 672px;
   object-fit: contain;
 }
 
@@ -102,7 +103,7 @@ body {
   border-radius: 12px;
 }
 
-/* ===== TEXTO (AJUSTADO) ===== */
+/* ===== TEXTO ===== */
 .condicao {
   margin-top: 20px;
   margin-bottom: 25px;
@@ -141,7 +142,7 @@ body {
   justify-content: center;
 }
 
-/* ===== CUPOM BOX (MAIOR) ===== */
+/* ===== CUPOM BOX ===== */
 .cupom-box {
   margin-top: 24px;
   margin-bottom: 15px;
@@ -220,8 +221,8 @@ body {
 <div class="card">
 
   <div class="selo">
-  <img src="{{SELO}}" alt="Selo">
- </div>
+    <img src="{{SELO}}" alt="Selo">
+  </div>
 
   <div class="logo">
     <img src="{{LOGO}}" alt="Logo">
@@ -254,7 +255,7 @@ body {
   <div class="rodape">
     <div class="uf">{{URN}}</div>
     <div class="uf">{{UF}}</div>
-    <div class="segmento">{{SEGMENTO}}</div>
+    <div class="segmento" id="segmento-bloco">NEGÓCIO DE CLIENTES: {{SEGMENTO}}</div>
   </div>
 
 </div>
@@ -263,18 +264,25 @@ body {
 (function () {
 
   const el = document.getElementById("cupom-text");
-  if (!el) return;
+  if (el) {
+    const container = el.parentElement;
 
-  const container = el.parentElement;
+    let fontSize = 118;
+    const min = 24;
 
-  let fontSize = 118;
-  const min = 24;
+    el.style.whiteSpace = "nowrap";
 
-  el.style.whiteSpace = "nowrap";
+    while ((el.scrollWidth > container.clientWidth - 20) && fontSize > min) {
+      fontSize--;
+      el.style.fontSize = fontSize + "px";
+    }
+  }
 
-  while ((el.scrollWidth > container.clientWidth - 20) && fontSize > min) {
-    fontSize--;
-    el.style.fontSize = fontSize + "px";
+  const segmento = document.getElementById("segmento-bloco");
+  const valorSegmento = "{{SEGMENTO}}".trim();
+
+  if (!valorSegmento && segmento) {
+    segmento.style.display = "none";
   }
 
 })();

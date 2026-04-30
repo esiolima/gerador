@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<title>Cupom de Desconto</title>
+
+<style>
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Regular.ttf') format('truetype');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Bold.ttf') format('truetype');
+  font-weight: 700;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Black.ttf') format('truetype');
+  font-weight: 900;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: Inter, sans-serif;
+  text-transform: uppercase;
+}
+
+body {
+  margin: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card {
+  width: 700px;
+  height: 1057.5px;
+  border: 6px solid #F2C94C;
+  border-radius: 48px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  overflow: visible; /* permite ultrapassar moldura */
+  position: relative;
+  color: #1F3C6E;
+}
+
+/* ===== SELO DINÂMICO ===== */
+.selo {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 130px;
+  height: 65px;
+  background: transparent;
+  display: none;
+  z-index: 999;
+}
+
+.selo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ===== LOGO ===== */
+.logo {
+  margin-top: 60px;
+  height: 154px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo img {
+  max-height: 154px;
+  max-width: 520px;
+  object-fit: contain;
+}
+
+/* ===== TEXTO SUPERIOR ===== */
+.condicao {
+  margin-top: 35px;
+  margin-bottom: 60px;
+  max-width: 550px;
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* ===== BENEFÍCIO ===== */
+.percentual {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding: 0 30px;
+  margin-bottom: 10px;
+}
+
+.numero,
+.percent {
+  font-weight: 900;
+  font-size: clamp(120px, 25vw, 270px);
+  line-height: 1;
+}
+
+.percent {
+  margin-left: 6px;
+}
+
+.desconto {
+  margin-top: 10px;
+  font-size: clamp(40px, 5vw, 60px);
+  font-weight: 700;
+}
+
+/* ===== COMPLEMENTO ===== */
+.complemento {
+  margin-top: 20px;
+  max-width: 550px;
+  font-size: 24px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+/* ===== LEGAL ===== */
+.legal {
+  margin-top: 25px;
+  max-width: 550px;
+  font-size: 18px;
+  line-height: 1.15;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* ===== ESPAÇO FLEX ===== */
+.espaco-flexivel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== CUPOM BOX ===== */
+.cupom-box {
+  margin-top: 30px;
+  margin-bottom: 15px;
+  width: 600px;
+  height: 140px;
+  background: #16A7E0;
+  border-radius: 20px;
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  overflow: hidden;
+}
+
+.cupom-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cupom-label span {
+  transform: rotate(-90deg);
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.cupom-codigo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px;
+  width: 100%;
+  height: 100%;
+  font-weight: 900;
+  color: #ffffff;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+#cupom-text {
+  font-size: 110px;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* ===== RODAPÉ ===== */
+.rodape {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.uf {
+  font-size: clamp(20px, 2vw, 24px);
+  font-weight: 700;
+}
+
+.segmento {
+  margin-top: 12px;
+  font-size: clamp(18px, 2vw, 20px);
+  font-weight: 400;
+}
+</style>
+</head>
+
+<body>
+<div class="card">
+
+  <!-- SELO DINÂMICO -->
+  <div class="selo" id="selo-container">
+    <img id="selo-img" alt="Selo">
+  </div>
+
+  <div class="logo">
+    <img src="{{LOGO}}" alt="Logo">
+  </div>
+
+  <div class="condicao">{{TEXTO}}</div>
+
+  <div class="percentual">
+    <div class="numero">{{VALOR}}</div>
+    <div class="percent">%</div>
+  </div>
+
+  <div class="desconto">DE DESCONTO</div>
+
+  <div class="espaco-flexivel">
+    <div class="complemento">{{COMPLEMENTO}}</div>
+    <div class="legal">{{LEGAL}}</div>
+  </div>
+
+  <div class="cupom-box">
+    <div class="cupom-label">
+      <span>CUPOM</span>
+    </div>
+    <div class="cupom-codigo">
+      <span id="cupom-text">{{CUPOM}}</span>
+    </div>
+  </div>
+
+  <div class="rodape">
+    <div class="uf">{{URN}}</div>
+    <div class="uf">{{UF}}</div>
+    <div class="segmento" id="segmento-bloco">
+      NEGOCIO DE CLIENTES: {{SEGMENTO}}
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  try {
+
+    /* ===== AJUSTE AUTOMÁTICO CUPOM ===== */
+    const el = document.getElementById("cupom-text");
+    if (el) {
+      const container = el.parentElement;
+      const style = window.getComputedStyle(container);
+      const paddingLeft = parseFloat(style.paddingLeft);
+      const paddingRight = parseFloat(style.paddingRight);
+      const larguraDisponivel =
+        container.clientWidth - paddingLeft - paddingRight;
+
+      let fontSize = 110;
+      const minFontSize = 20;
+
+      el.style.whiteSpace = "nowrap";
+      el.style.fontSize = fontSize + "px";
+
+      while (el.scrollWidth > larguraDisponivel && fontSize > minFontSize) {
+        fontSize--;
+        el.style.fontSize = fontSize + "px";
+      }
+    }
+
+    /* ===== SEGMENTO ===== */
+    const segmento = document.getElementById("segmento-bloco");
+    const valorSegmento = "{{SEGMENTO}}".trim();
+    if (!valorSegmento && segmento) {
+      segmento.style.display = "none";
+    }
+
+    /* ===== SELO ===== */
+    const seloContainer = document.getElementById("selo-container");
+    const seloImg = document.getElementById("selo-img");
+    const valorSelo = "{{SELO}}".trim();
+
+    if (valorSelo) {
+      seloImg.src = valorSelo;
+      seloContainer.style.display = "block";
+    }
+
+  } catch (e) {
+    console.log("Erro ajuste cupom:", e);
+  }
+})();
+</script>
+
+</body>
+</html>

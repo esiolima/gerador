@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=700, initial-scale=1.0" />
+<title>Promoção</title>
+
+<style>
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Regular.ttf') format('truetype');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Bold.ttf') format('truetype');
+  font-weight: 700;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('../fonts/Inter-Black.ttf') format('truetype');
+  font-weight: 900;
+}
+
+* {
+  text-transform: uppercase;
+  color: #2b4474;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  margin: 0;
+  width: 700px;
+  height: 1058px;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ================= CARD ================= */
+.card {
+  width: 700px;
+  height: 1058px;
+  border: 8px solid #e0b84b;
+  border-radius: 40px;
+  padding: 70px 40px 40px 40px; /* Reduzido padding inferior para dar margem ao segmento */
+  position: relative;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+}
+
+/* ===== SELO DINÂMICO TRANSPARENTE ===== */
+.selo {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 130px;
+  height: 65px;
+  background: transparent;
+  display: none; /* começa oculto */
+  z-index: 999;
+}
+
+.selo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ===== TOPO ===== */
+.topo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.logo {
+  margin-bottom: 25px;
+}
+.logo img {
+  max-width: 220px;
+  max-height: 120px;
+}
+
+.tarja {
+  background: #ff7a00;
+  color: #ffffff;
+  padding: 20px 70px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 54px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ===== BLOCO CENTRAL ===== */
+.bloco-central {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.texto-topo {
+  text-align: center;
+  font-size: 28px;
+  max-width: 550px;
+  line-height: 1.15;
+  word-break: break-word;
+  margin-top: 25px; /* Descolado do box PROMOÇÃO */
+  margin-bottom: 20px;
+}
+
+.valor-container {
+  width: 100%;
+  height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.valor-texto {
+  font-weight: 900;
+  font-size: 480px;
+  line-height: 0.9; /* Ajustado para permitir quebra de linha melhor */
+  text-align: center;
+  word-break: break-word; /* Permitir quebra de linha */
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Máximo de 3 linhas */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== BLOCO INFERIOR ===== */
+.bloco-inferior {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.complemento {
+  text-align: center;
+  font-size: 22px; /* Reduzido conforme solicitado */
+  max-width: 550px;
+  line-height: 1.15;
+  word-break: break-word;
+  margin-top: 10px;
+}
+
+.legal {
+  text-align: center;
+  font-size: 18px;
+  max-width: 550px;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.rodape {
+  text-align: center;
+  margin-bottom: 15px; /* Margem de segurança na base */
+}
+
+.uf {
+  font-size: clamp(20px, 2vw, 24px);
+  font-weight: 700;
+}
+
+.segmento-wrapper {
+  margin-top: 10px;
+  font-size: 18px;
+  font-weight: 400;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <!-- SELO -->
+  <div class="selo" id="selo-container">
+    <img id="selo-img" />
+  </div>
+
+  <!-- TOPO -->
+  <div class="topo">
+    <div class="logo">
+      <img src="{{LOGO}}" />
+    </div>
+
+    <div class="tarja">
+      PROMOÇÃO
+    </div>
+  </div>
+
+  <!-- CENTRO -->
+  <div class="bloco-central">
+
+    <div class="texto-topo">
+      {{TEXTO}}
+    </div>
+
+    <div class="valor-container" id="valor-container">
+      <div class="valor-texto" id="valor-texto">
+        {{VALOR}}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFERIOR -->
+  <div class="bloco-inferior">
+
+    <div class="complemento">
+      {{COMPLEMENTO}}
+    </div>
+
+    <div class="legal">
+      {{LEGAL}}
+    </div>
+
+    <div class="rodape">
+      <div class="uf">{{URN}}</div>
+      <div class="uf">{{UF}}</div>
+
+      <div class="segmento-wrapper" id="segmento-bloco">
+        NEGOCIO DE CLIENTES: {{SEGMENTO}}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+window.addEventListener("load", function () {
+
+  /* ===== AJUSTE VALOR ===== */
+  const container = document.getElementById("valor-container");
+  const texto = document.getElementById("valor-texto");
+
+  if (container && texto) {
+    let fontSize = 480;
+    texto.style.fontSize = fontSize + "px";
+
+    // Lógica de ajuste: reduz a fonte se extrapolar o container (mesmo com quebra de linha)
+    while (
+      (texto.scrollHeight > container.clientHeight || texto.scrollWidth > container.clientWidth) &&
+      fontSize > 60
+    ) {
+      fontSize -= 10;
+      texto.style.fontSize = fontSize + "px";
+    }
+  }
+
+  /* ===== SEGMENTO ===== */
+  const segmento = document.getElementById("segmento-bloco");
+  const valorSegmento = "{{SEGMENTO}}".trim();
+
+  if (!valorSegmento && segmento) {
+    segmento.style.display = "none";
+  }
+
+  /* ===== SELO DINÂMICO ===== */
+  const seloContainer = document.getElementById("selo-container");
+  const seloImg = document.getElementById("selo-img");
+  const valorSelo = "{{SELO}}".trim();
+
+  if (valorSelo) {
+    seloImg.src = valorSelo;
+    seloContainer.style.display = "block";
+  }
+
+});
+</script>
+
+</body>
+</html>

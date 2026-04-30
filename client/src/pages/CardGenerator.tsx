@@ -62,6 +62,209 @@ function groupByCategory(cards: GeneratedCard[]) {
   return Object.entries(groups);
 }
 
+function extractCardHtml(html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  const styles = Array.from(doc.querySelectorAll("style"))
+    .map((style) => style.outerHTML)
+    .join("\n");
+
+  const body = doc.body?.innerHTML || html;
+
+  return `
+    ${styles}
+    <style>
+      :host {
+        display:block;
+        width:700px;
+        height:1058px;
+        overflow:hidden;
+        background:#fff;
+      }
+
+      * {
+        box-sizing:border-box;
+      }
+
+      .logo {
+        cursor:pointer !important;
+      }
+
+      .logo:empty,
+      .logo:not(:has(img)),
+      .logo img[src=""] {
+        background:#f1f1f1;
+        border:2px dashed #d2d2d2;
+        border-radius:14px;
+      }
+    </style>
+    ${body}
+  `;
+}
+
+function runCardFit(root: ShadowRoot) {
+  const fitText = (
+    el: HTMLElement | null,
+    container: HTMLElement | null,
+    options: { max: number; min: number; nowrap?: boolean; lineHeight?: string }
+  ) => {
+    if (!el || !container) return;
+
+    el.style.display = "block";
+    el.style.maxWidth = "100%";
+    el.style.textAlign = "center";
+    el.style.whiteSpace = options.nowrap ? "nowrap" : "normal";
+    el.style.wordBreak = "keep-all";
+    el.style.overflowWrap = "normal";
+    el.style.lineHeight = options.lineHeight || "0.92";
+
+    for (let size = options.max; size >= options.min; size--) {
+      el.style.fontSize = `${size}px`;
+
+      if (
+        el.scrollWidth <= container.clientWidth &&
+        el.scrollHeight <= container.clientHeight
+      ) {
+        break;
+      }
+    }
+  };
+
+  fitText(
+    (root.getElementById("valor-texto") ||
+      root.querySelector(".valor-texto")) as HTMLElement | null,
+    (root.getElementById("valor-container") ||
+      root.querySelector(".valor-container")) as HTMLElement | null,
+    { max: 520, min: 22, nowrap: false, lineHeight: "0.9" }
+  );
+
+  fitText(
+    root.getElementById("cupom-text") as HTMLElement | null,
+    root.querySelector(".cupom-codigo") as HTMLElement | null,
+    { max: 120, min: 18, nowrap: true, lineHeight: "1" }
+  );
+
+  const segmento = root.getElementById("segmento-bloco") as HTMLElement | null;
+  if (segmento && segmento.textContent?.includes("{{SEGMENTO}}")) {
+    segmento.style.display = "none";
+  }
+
+  const logo = root.querySelector(".logo") as HTMLElement | null;
+  const logoImg = logo?.querySelector("img") as HTMLImageElement | null;
+  if (logo && logoImg && !logoImg.getAttribute("src")) {
+    logoImg.style.display = "none";
+  }
+}
+
+function ShadowCard({
+  html,
+  cardKey,
+}: {
+  html: string;
+  cardKey: string;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    const shadow = host.shadowRoot || host.attachShadow({ mode: "open" });
+    shadow.innerHTML = extractCardHtml(html);
+
+    const setup = () => {
+      runCardFit(shadow);
+
+      const logo = shadow.querySelector(".logo") as HTMLElement | null;
+      if (!logo) return;
+
+      logo.onclick = (event) => {
+        event.stopPropagation();
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+
+        input.onchange = async (changeEvent: Event) => {
+          const target = changeEvent.target as HTMLInputElement | null;
+          const selectedFile = target?.files?.[0];
+
+          if (!selectedFile) return;
+
+          if (!selectedFile.type.startsWith("image/")) {
+            window.alert("Envie apenas arquivos de imagem.");
+            return;
+          }
+
+          const dataUrl = await readImageAsDataUrl(selectedFile);
+
+          let image = logo.querySelector("img") as HTMLImageElement | null;
+
+          if (!image) {
+            image = document.createElement("img");
+            image.alt = "Logo";
+            logo.appendChild(image);
+          }
+
+          image.src = dataUrl;
+          image.style.display = "block";
+        };
+
+        input.click();
+      };
+    };
+
+    requestAnimationFrame(setup);
+  }, [html]);
+
+  return (
+    <div
+      ref={hostRef}
+      className="journal-card-shadow-host"
+      data-card-key={cardKey}
+    />
+  );
+}
+
+function serializeJournalForPdf(journalElement: HTMLDivElement) {
+  const clone = journalElement.cloneNode(true) as HTMLDivElement;
+
+  const originalHosts = Array.from(
+    journalElement.querySelectorAll(".journal-card-shadow-host")
+  ) as HTMLDivElement[];
+
+  const clonedHosts = Array.from(
+    clone.querySelectorAll(".journal-card-shadow-host")
+  ) as HTMLDivElement[];
+
+  clonedHosts.forEach((clonedHost, index) => {
+    const originalHost = originalHosts[index];
+    const shadowHtml = originalHost?.shadowRoot?.innerHTML || "";
+
+    clonedHost.innerHTML = `
+      <template shadowrootmode="open">
+        ${shadowHtml}
+      </template>
+    `;
+  });
+
+  const activateDeclarativeShadowDom = `
+    <script>
+      document.querySelectorAll("template[shadowrootmode]").forEach(function(template) {
+        var mode = template.getAttribute("shadowrootmode");
+        var parent = template.parentNode;
+        if (!parent || parent.shadowRoot) return;
+        var shadow = parent.attachShadow({ mode: mode || "open" });
+        shadow.appendChild(template.content.cloneNode(true));
+        template.remove();
+      });
+    </script>
+  `;
+
+  return `${clone.outerHTML}${activateDeclarativeShadowDom}`;
+}
+
 export default function CardGenerator() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -210,51 +413,14 @@ export default function CardGenerator() {
     if (kind === "ad") setAdImage(dataUrl);
   };
 
-  const handleJournalClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
-
-    const logoContainer = target.closest(".logo") as HTMLElement | null;
-    if (!logoContainer) return;
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-
-    input.onchange = async (changeEvent: Event) => {
-      const inputTarget = changeEvent.target as HTMLInputElement | null;
-      const selectedFile = inputTarget?.files?.[0];
-
-      if (!selectedFile) return;
-
-      if (!selectedFile.type.startsWith("image/")) {
-        window.alert("Envie apenas arquivos de imagem.");
-        return;
-      }
-
-      const dataUrl = await readImageAsDataUrl(selectedFile);
-
-      let image = logoContainer.querySelector("img") as HTMLImageElement | null;
-
-      if (!image) {
-        image = document.createElement("img");
-        image.alt = "Logo";
-        logoContainer.appendChild(image);
-      }
-
-      image.src = dataUrl;
-      image.style.display = "block";
-    };
-
-    input.click();
-  };
-
   const generateJournalPdf = async () => {
     if (!journalRef.current || !result) return;
 
     setIsGeneratingJournal(true);
 
     try {
+      const serializedJournal = serializeJournalForPdf(journalRef.current);
+
       const body = `<!doctype html>
 <html>
 <head>
@@ -262,7 +428,7 @@ export default function CardGenerator() {
   <style>${journalCss}</style>
 </head>
 <body>
-  ${journalRef.current.outerHTML}
+  ${serializedJournal}
 </body>
 </html>`;
 
@@ -505,11 +671,7 @@ export default function CardGenerator() {
 
             <div className="journal-preview-viewport">
               <div className="journal-preview-scaler">
-                <div
-                  ref={journalRef}
-                  className="journal-root"
-                  onClick={handleJournalClick}
-                >
+                <div ref={journalRef} className="journal-root">
                   <div className="journal-page-label">Página 1 — Capa</div>
 
                   <div
@@ -543,8 +705,12 @@ export default function CardGenerator() {
                             <div
                               className="journal-card-wrap"
                               key={`${card.ordem}-${card.tipo}-${index}`}
-                              dangerouslySetInnerHTML={{ __html: card.html }}
-                            />
+                            >
+                              <ShadowCard
+                                html={card.html}
+                                cardKey={`${card.ordem}-${card.tipo}-${index}`}
+                              />
+                            </div>
                           ))}
                         </div>
                       </section>
@@ -670,8 +836,7 @@ const journalCss = `
 
   .journal-cover,
   .journal-header,
-  .journal-card-wrap,
-  .journal-card-wrap .logo{
+  .journal-card-wrap{
     cursor:pointer;
   }
 
@@ -762,12 +927,12 @@ const journalCss = `
   }
 
   .journal-grid{
-   display:flex;
-   flex-wrap:wrap;
-   gap:70px;
-   justify-content:center;
-   padding:30px 80px 70px 80px;
-   box-sizing:border-box;
+    display:flex;
+    flex-wrap:wrap;
+    gap:70px;
+    justify-content:center;
+    padding:30px 80px 70px 80px;
+    box-sizing:border-box;
   }
 
   .journal-card-wrap{
@@ -780,16 +945,12 @@ const journalCss = `
     box-shadow:0 16px 32px rgba(0,0,0,.10);
   }
 
-  .journal-card-wrap .logo{
-    cursor:pointer !important;
-  }
-
-  .journal-card-wrap .logo:empty,
-  .journal-card-wrap .logo:not(:has(img)),
-  .journal-card-wrap .logo img[src=""]{
-    background:#f1f1f1;
-    border:2px dashed #d2d2d2;
-    border-radius:14px;
+  .journal-card-shadow-host{
+    display:block;
+    width:700px;
+    height:1058px;
+    overflow:hidden;
+    background:#fff;
   }
 
   .journal-footer-text{

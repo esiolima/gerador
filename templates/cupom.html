@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -73,21 +72,20 @@ body {
   display: none;
 }
 
-/* ===== LOGO ===== */
+/* ===== LOGO REDUZIDO (50%) ===== */
 .logo {
   margin-top: 45px;
-  height: 228px;
+  height: 114px; /* 🔥 metade de 228 */
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  flex-shrink: 0;
 }
 
 .logo img {
-  max-height: 228px;
-  max-width: 672px;
+  max-height: 114px;
+  max-width: 336px;
   object-fit: contain;
 }
 
@@ -148,13 +146,12 @@ body {
   margin-bottom: 15px;
   width: 600px;
   height: 200px;
-  min-height: 200px;
   background: #16A7E0;
   border-radius: 20px;
+
   display: grid;
   grid-template-columns: 95px minmax(0, 1fr);
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 /* LADO ESQUERDO */
@@ -162,17 +159,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
 }
 
 .cupom-label span {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
   font-size: 26px;
-  line-height: 1;
   font-weight: 700;
   color: #ffffff;
-  white-space: nowrap;
 }
 
 /* CÓDIGO */
@@ -202,7 +196,6 @@ body {
 .rodape {
   margin-bottom: 30px;
   text-align: center;
-  flex-shrink: 0;
 }
 
 .uf {
@@ -255,7 +248,9 @@ body {
   <div class="rodape">
     <div class="uf">{{URN}}</div>
     <div class="uf">{{UF}}</div>
-    <div class="segmento" id="segmento-bloco">NEGÓCIO DE CLIENTES: {{SEGMENTO}}</div>
+    <div class="segmento" id="segmento-bloco">
+      NEGÓCIO DE CLIENTES: {{SEGMENTO}}
+    </div>
   </div>
 
 </div>
@@ -264,9 +259,10 @@ body {
 (function () {
 
   const el = document.getElementById("cupom-text");
-  const container = el ? el.parentElement : null;
 
-  if (el && container) {
+  if (el) {
+    const container = el.parentElement;
+
     let fontSize = 100;
     const min = 24;
 
@@ -288,7 +284,7 @@ body {
   const segmento = document.getElementById("segmento-bloco");
 
   if (segmento) {
-    const texto = segmento.textContent ? segmento.textContent.trim() : "";
+    const texto = segmento.textContent?.trim() || "";
 
     if (!texto || texto === "NEGÓCIO DE CLIENTES:") {
       segmento.style.display = "none";

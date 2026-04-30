@@ -1,3 +1,5 @@
+<!-- templates/cupom.html CORRIGIDO -->
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -45,28 +47,9 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 0 20px;
-  overflow: visible; /* permite ultrapassar moldura */
   position: relative;
   color: #1F3C6E;
-}
-
-/* ===== SELO DINÂMICO ===== */
-.selo {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  width: 130px;
-  height: 65px;
-  background: transparent;
-  display: none;
-  z-index: 999;
-}
-
-.selo img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
+  overflow: hidden;
 }
 
 /* ===== LOGO ===== */
@@ -84,16 +67,14 @@ body {
   object-fit: contain;
 }
 
-/* ===== TEXTO SUPERIOR ===== */
+/* ===== TEXTO ===== */
 .condicao {
   margin-top: 35px;
   margin-bottom: 60px;
   max-width: 550px;
   font-size: 28px;
-  font-weight: 400;
   line-height: 1.15;
   text-align: center;
-  word-break: break-word;
 }
 
 /* ===== BENEFÍCIO ===== */
@@ -102,20 +83,14 @@ body {
   align-items: flex-end;
   justify-content: center;
   width: 100%;
-  padding: 0 30px;
-  margin-bottom: 10px;
 }
 
-.numero,
-.percent {
+.numero, .percent {
   font-weight: 900;
   font-size: clamp(120px, 25vw, 270px);
-  line-height: 1;
 }
 
-.percent {
-  margin-left: 6px;
-}
+.percent { margin-left: 6px; }
 
 .desconto {
   margin-top: 10px;
@@ -123,31 +98,11 @@ body {
   font-weight: 700;
 }
 
-/* ===== COMPLEMENTO ===== */
-.complemento {
-  margin-top: 20px;
-  max-width: 550px;
-  font-size: 24px;
-  line-height: 1.15;
-  text-align: center;
-}
-
-/* ===== LEGAL ===== */
-.legal {
-  margin-top: 25px;
-  max-width: 550px;
-  font-size: 18px;
-  line-height: 1.15;
-  text-align: center;
-  word-break: break-word;
-}
-
-/* ===== ESPAÇO FLEX ===== */
+/* ===== FLEX ===== */
 .espaco-flexivel {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
 }
 
@@ -159,11 +114,12 @@ body {
   height: 140px;
   background: #16A7E0;
   border-radius: 20px;
+
   display: grid;
-  grid-template-columns: 90px 1fr;
-  overflow: hidden;
+  grid-template-columns: 70px 1fr; /* MENOR espaço lateral */
 }
 
+/* LADO ESQUERDO */
 .cupom-label {
   display: flex;
   align-items: center;
@@ -172,27 +128,29 @@ body {
 
 .cupom-label span {
   transform: rotate(-90deg);
-  font-size: clamp(20px, 2.4vw, 28px);
+  font-size: 24px;
   font-weight: 700;
   color: #ffffff;
 }
 
+/* CÓDIGO */
 .cupom-codigo {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 40px;
+
+  padding: 0 20px; /* 👈 MARGEM INTERNA */
   width: 100%;
   height: 100%;
-  font-weight: 900;
-  color: #ffffff;
-  overflow: hidden;
-  box-sizing: border-box;
 }
 
 #cupom-text {
+  font-weight: 900;
+  color: #ffffff;
+
   font-size: 110px;
   line-height: 1;
+
   white-space: nowrap;
   display: inline-block;
 }
@@ -204,25 +162,19 @@ body {
 }
 
 .uf {
-  font-size: clamp(20px, 2vw, 24px);
+  font-size: 22px;
   font-weight: 700;
 }
 
 .segmento {
   margin-top: 12px;
-  font-size: clamp(18px, 2vw, 20px);
-  font-weight: 400;
+  font-size: 20px;
 }
 </style>
 </head>
 
 <body>
 <div class="card">
-
-  <!-- SELO DINÂMICO -->
-  <div class="selo" id="selo-container">
-    <img id="selo-img" alt="Selo">
-  </div>
 
   <div class="logo">
     <img src="{{LOGO}}" alt="Logo">
@@ -246,6 +198,7 @@ body {
     <div class="cupom-label">
       <span>CUPOM</span>
     </div>
+
     <div class="cupom-codigo">
       <span id="cupom-text">{{CUPOM}}</span>
     </div>
@@ -254,59 +207,30 @@ body {
   <div class="rodape">
     <div class="uf">{{URN}}</div>
     <div class="uf">{{UF}}</div>
-    <div class="segmento" id="segmento-bloco">
-      NEGOCIO DE CLIENTES: {{SEGMENTO}}
-    </div>
+    <div class="segmento">{{SEGMENTO}}</div>
   </div>
 
 </div>
 
 <script>
 (function () {
-  try {
 
-    /* ===== AJUSTE AUTOMÁTICO CUPOM ===== */
-    const el = document.getElementById("cupom-text");
-    if (el) {
-      const container = el.parentElement;
-      const style = window.getComputedStyle(container);
-      const paddingLeft = parseFloat(style.paddingLeft);
-      const paddingRight = parseFloat(style.paddingRight);
-      const larguraDisponivel =
-        container.clientWidth - paddingLeft - paddingRight;
+  const el = document.getElementById("cupom-text");
 
-      let fontSize = 110;
-      const minFontSize = 20;
+  if (!el) return;
 
-      el.style.whiteSpace = "nowrap";
-      el.style.fontSize = fontSize + "px";
+  const container = el.parentElement;
 
-      while (el.scrollWidth > larguraDisponivel && fontSize > minFontSize) {
-        fontSize--;
-        el.style.fontSize = fontSize + "px";
-      }
-    }
+  let fontSize = 110;
+  const min = 20;
 
-    /* ===== SEGMENTO ===== */
-    const segmento = document.getElementById("segmento-bloco");
-    const valorSegmento = "{{SEGMENTO}}".trim();
-    if (!valorSegmento && segmento) {
-      segmento.style.display = "none";
-    }
+  el.style.whiteSpace = "nowrap";
 
-    /* ===== SELO ===== */
-    const seloContainer = document.getElementById("selo-container");
-    const seloImg = document.getElementById("selo-img");
-    const valorSelo = "{{SELO}}".trim();
-
-    if (valorSelo) {
-      seloImg.src = valorSelo;
-      seloContainer.style.display = "block";
-    }
-
-  } catch (e) {
-    console.log("Erro ajuste cupom:", e);
+  while (el.scrollWidth > container.clientWidth && fontSize > min) {
+    fontSize--;
+    el.style.fontSize = fontSize + "px";
   }
+
 })();
 </script>
 

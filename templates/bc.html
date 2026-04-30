@@ -53,16 +53,16 @@ body {
   position: relative;
 }
 
-/* ===== SELO DINÂMICO ===== */
+/* ===== SELO ===== */
 .selo {
   position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 130px;
-  height: 65px;
+  top: 10px;
+  left: 10px;
+  width: 117px;
+  height: 58.5px;
   background: transparent;
-  display: none;
-  z-index: 999;
+  z-index: 99999;
+  pointer-events: none;
 }
 
 .selo img {
@@ -70,6 +70,10 @@ body {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.selo img[src=""] {
+  display: none;
 }
 
 /* ===== TOPO ===== */
@@ -137,7 +141,6 @@ body {
   word-break: break-word;
 }
 
-/* ===== VALOR GRANDE + AUTO AJUSTE ===== */
 .valor-container {
   width: 100%;
   height: 245px;
@@ -201,8 +204,8 @@ body {
 
 <div class="card">
 
-  <div class="selo" id="selo-container">
-    <img id="selo-img" alt="Selo" />
+  <div class="selo">
+    <img src="{{SELO}}" alt="Selo" />
   </div>
 
   <div class="topo">
@@ -276,19 +279,13 @@ window.addEventListener("load", function () {
   }
 
   const segmento = document.getElementById("segmento-bloco");
-  const valorSegmento = "{{SEGMENTO}}".trim();
 
-  if (!valorSegmento && segmento) {
-    segmento.style.display = "none";
-  }
+  if (segmento) {
+    const texto = segmento.textContent ? segmento.textContent.trim() : "";
 
-  const seloContainer = document.getElementById("selo-container");
-  const seloImg = document.getElementById("selo-img");
-  const valorSelo = "{{SELO}}".trim();
-
-  if (valorSelo && seloContainer && seloImg) {
-    seloImg.src = valorSelo;
-    seloContainer.style.display = "block";
+    if (!texto || texto === "NEGÓCIO DE CLIENTES:") {
+      segmento.style.display = "none";
+    }
   }
 
 });

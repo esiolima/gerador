@@ -21,10 +21,13 @@ export type GeneratedCard = {
   valor: string;
   cupom: string;
   logoFile: string;
+  hasLogo: boolean;
   pdfName: string;
   pngName: string;
+  htmlName: string;
   pdfUrl: string;
   pngUrl: string;
+  htmlUrl: string;
 };
 
 export type GenerateCardsResult = {
@@ -146,8 +149,8 @@ export class CardGenerator extends EventEmitter {
   }
 
   private findLogoFile(logoName: string): string {
-    if (!fs.existsSync(LOGOS_DIR)) return "blank.png";
-    if (!logoName || String(logoName).trim() === "") return "blank.png";
+    if (!fs.existsSync(LOGOS_DIR)) return "";
+    if (!logoName || String(logoName).trim() === "") return "";
 
     const cleanName = String(logoName).trim();
     const extensions = [".png", ".jpg", ".jpeg", ".webp", ".svg", ".jfif", ".avif"];
@@ -171,7 +174,7 @@ export class CardGenerator extends EventEmitter {
       path.parse(f).name.toLowerCase().startsWith(searchName)
     );
 
-    return prefixMatch || "blank.png";
+    return prefixMatch || "";
   }
 
   private validateRows(rows: any[]): void {
@@ -217,6 +220,16 @@ export class CardGenerator extends EventEmitter {
   private injectFittingHelpers(html: string): string {
     const helper = `
 <style id="fit-container-helpers">
+  html, body {
+    width:700px;
+    min-width:700px;
+    max-width:700px;
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    background:transparent;
+  }
+
   .card {
     background:#fff;
     overflow:hidden;
@@ -236,6 +249,11 @@ export class CardGenerator extends EventEmitter {
     height:100%;
     object-fit:contain;
     display:block;
+  }
+
+  .logo img[src=""],
+  .logo img:not([src]) {
+    display:none;
   }
 
   #valor-texto,
@@ -283,7 +301,7 @@ export class CardGenerator extends EventEmitter {
     fitText(
       document.getElementById("cupom-text"),
       document.querySelector(".cupom-codigo"),
-      { max: 128, min: 18, nowrap: true, lineHeight: "1" }
+      { max: 120, min: 18, nowrap: true, lineHeight: "1" }
     );
   }
 
@@ -390,7 +408,8 @@ export class CardGenerator extends EventEmitter {
       }
 
       const logoFile = this.findLogoFile(row.logo);
-      const logoBase64 = this.imageToBase64(path.join(LOGOS_DIR, logoFile));
+      const logoBase64 = logoFile ? this.imageToBase64(path.join(LOGOS_DIR, logoFile)) : "";
+      const hasLogo = Boolean(logoBase64);
 
       const seloRaw = String(row.selo ?? "").trim().toLowerCase();
       const seloBase64 = seloRaw
@@ -411,24 +430,6 @@ export class CardGenerator extends EventEmitter {
       html = this.replacePlaceholders(html, row, tipo, logoBase64, seloBase64);
       html = this.injectFittingHelpers(html);
 
-      const tmpHtmlPath = path.join(TMP_DIR, `${jobId}_card_${index + 1}.html`);
-      fs.writeFileSync(tmpHtmlPath, html, "utf8");
-
-      const page = await this.browser.newPage();
-
-      await page.setViewport({
-        width: 700,
-        height: 1058,
-        deviceScaleFactor: 2,
-      });
-
-      await page.goto(`file://${tmpHtmlPath}`, {
-        waitUntil: "networkidle0",
-        timeout: 120000,
-      });
-
-      await this.waitForPageReady(page);
-
       const ordemFinal =
         row.ordem && String(row.ordem).trim() !== ""
           ? String(row.ordem).trim()
@@ -444,9 +445,30 @@ export class CardGenerator extends EventEmitter {
 
       const pdfName = `${safeOrdem}_${tipo}_${categoriaSlug}.pdf`;
       const pngName = `${safeOrdem}_${tipo}_${categoriaSlug}.png`;
+      const htmlName = `${safeOrdem}_${tipo}_${categoriaSlug}.html`;
 
       const pdfPath = path.join(jobDir, pdfName);
       const pngPath = path.join(jobDir, pngName);
+      const htmlPath = path.join(jobDir, htmlName);
+      const tmpHtmlPath = path.join(TMP_DIR, `${jobId}_card_${index + 1}.html`);
+
+      fs.writeFileSync(tmpHtmlPath, html, "utf8");
+      fs.writeFileSync(htmlPath, html, "utf8");
+
+      const page = await this.browser.newPage();
+
+      await page.setViewport({
+        width: 700,
+        height: 1058,
+        deviceScaleFactor: 2,
+      });
+
+      await page.goto(`file://${tmpHtmlPath}`, {
+        waitUntil: "networkidle0",
+        timeout: 120000,
+      });
+
+      await this.waitForPageReady(page);
 
       await page.pdf({
         path: pdfPath,
@@ -480,10 +502,13 @@ export class CardGenerator extends EventEmitter {
         valor: String(row.valor ?? ""),
         cupom: String(row.cupom ?? ""),
         logoFile,
+        hasLogo,
         pdfName,
         pngName,
+        htmlName,
         pdfUrl: `/output/${jobId}/${pdfName}`,
         pngUrl: `/output/${jobId}/${pngName}`,
+        htmlUrl: `/output/${jobId}/${htmlName}`,
       };
 
       cards.push(card);

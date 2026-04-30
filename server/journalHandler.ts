@@ -7,55 +7,142 @@ const OUTPUT_DIR = path.resolve("output");
 
 function assertInsideOutput(filePath: string) {
   const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(OUTPUT_DIR)) throw new Error("Acesso negado ao caminho solicitado.");
+  const outputResolved = path.resolve(OUTPUT_DIR);
+
+  if (!resolved.startsWith(outputResolved)) {
+    throw new Error("Acesso negado ao caminho solicitado.");
+  }
+
   return resolved;
+}
+
+function getChromiumExecutablePath() {
+  return (
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_BIN ||
+    process.env.CHROMIUM_PATH ||
+    "/usr/bin/chromium"
+  );
 }
 
 export function setupJournalRoute(app: express.Express) {
   app.post("/api/journal/pdf", async (req, res) => {
     const { html, jobId } = req.body ?? {};
+
     if (!html || typeof html !== "string") {
       return res.status(400).json({ error: "HTML do jornal não recebido." });
     }
 
-    const safeJobId = String(jobId || `journal_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeJobId = String(jobId || `journal_${Date.now()}`).replace(
+      /[^a-zA-Z0-9_-]/g,
+      ""
+    );
+
     const jobDir = path.join(OUTPUT_DIR, safeJobId);
     fs.mkdirSync(jobDir, { recursive: true });
+
     const htmlPath = assertInsideOutput(path.join(jobDir, "jornal_editado.html"));
     const pdfPath = assertInsideOutput(path.join(jobDir, "jornal_gerado.pdf"));
 
     const finalHtml = html.includes("<base")
       ? html
       : html.replace("<head>", `<head><base href="file://${path.resolve()}/">`);
+
     fs.writeFileSync(htmlPath, finalHtml, "utf8");
 
-    let browser: any = null;
+    let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+
     try {
       browser = await puppeteer.launch({
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_BIN || "/usr/bin/chromium",
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=none"],
+        executablePath: getChromiumExecutablePath(),
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--font-render-hinting=none",
+        ],
         headless: true,
       });
+
       const page = await browser.newPage();
-      await page.setViewport({ width: 1080, height: 1920, deviceScaleFactor: 1 });
-      await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0" });
+
+      await page.setViewport({
+        width: 1080,
+        height: 1920,
+        deviceScaleFactor: 1,
+      });
+
+      await page.goto(`file://${htmlPath}`, {
+        waitUntil: "networkidle0",
+        timeout: 120000,
+      });
+
       await page.evaluate(async () => {
+        // Remove marcadores visuais de página apenas no PDF final.
+        document.querySelectorAll(".journal-page-label").forEach((el) => el.remove());
+
+        // Remove qualquer escala de preview antes da exportação.
+        const root = document.querySelector(".journal-root") as HTMLElement | null;
+        if (root) {
+          root.style.transform = "none";
+          root.style.marginBottom = "0";
+        }
+
+        // Aguarda fontes.
         // @ts-ignore
         if (document.fonts?.ready) await document.fonts.ready;
+
+        // Aguarda imagens.
+        const images = Array.from(document.images);
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) return Promise.resolve();
+
+            return new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            });
+          })
+        );
       });
-      const height = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+
+      const dimensions = await page.evaluate(() => {
+        const root = document.querySelector(".journal-root") as HTMLElement | null;
+        const height = root
+          ? Math.ceil(root.getBoundingClientRect().height)
+          : Math.ceil(document.documentElement.scrollHeight);
+
+        return {
+          width: 1080,
+          height: Math.max(height, 1920),
+        };
+      });
+
       await page.pdf({
         path: pdfPath,
         printBackground: true,
-        width: "1080px",
-        height: `${Math.max(height, 1920)}px`,
-        margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+        width: `${dimensions.width}px`,
+        height: `${dimensions.height}px`,
+        margin: {
+          top: "0px",
+          right: "0px",
+          bottom: "0px",
+          left: "0px",
+        },
         preferCSSPageSize: false,
       });
+
       await page.close();
-      return res.json({ success: true, pdfPath, pdfUrl: `/api/journal/download?path=${encodeURIComponent(pdfPath)}` });
+
+      return res.json({
+        success: true,
+        pdfPath,
+        pdfUrl: `/api/journal/download?path=${encodeURIComponent(pdfPath)}`,
+      });
     } catch (error) {
-      return res.status(500).json({ error: error instanceof Error ? error.message : "Erro ao gerar PDF do jornal." });
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Erro ao gerar PDF do jornal.",
+      });
     } finally {
       if (browser) await browser.close();
     }
@@ -63,13 +150,23 @@ export function setupJournalRoute(app: express.Express) {
 
   app.get("/api/journal/download", (req, res) => {
     const requested = req.query.path;
-    if (!requested || typeof requested !== "string") return res.status(400).json({ error: "PDF inválido." });
+
+    if (!requested || typeof requested !== "string") {
+      return res.status(400).json({ error: "PDF inválido." });
+    }
+
     try {
       const resolved = assertInsideOutput(requested);
-      if (!fs.existsSync(resolved)) return res.status(404).json({ error: "PDF não encontrado." });
-      res.download(resolved, path.basename(resolved));
+
+      if (!fs.existsSync(resolved)) {
+        return res.status(404).json({ error: "PDF não encontrado." });
+      }
+
+      return res.download(resolved, path.basename(resolved));
     } catch (error) {
-      res.status(403).json({ error: error instanceof Error ? error.message : "Acesso negado." });
+      return res.status(403).json({
+        error: error instanceof Error ? error.message : "Acesso negado.",
+      });
     }
   });
 }

@@ -28,24 +28,14 @@ type GeneratedCard = {
   ordem: string;
   tipo: string;
   categoria: string;
-  categoriaSlug: string;
-  texto: string;
-  valor: string;
-  cupom: string;
-  logoFile: string;
+  html: string;
   hasLogo: boolean;
-  pdfName: string;
-  pngName: string;
-  htmlName: string;
-  pdfUrl: string;
-  pngUrl: string;
-  htmlUrl: string;
 };
 
 type ProcessResult = {
-  jobId: string;
+  jobId?: string;
   zipPath: string;
-  fileName: string;
+  fileName?: string;
   cards: GeneratedCard[];
   totalRows: number;
   processedRows: number;
@@ -62,11 +52,13 @@ function readImageAsDataUrl(file: File): Promise<string> {
 
 function groupByCategory(cards: GeneratedCard[]) {
   const groups: Record<string, GeneratedCard[]> = {};
+
   cards.forEach((card) => {
     const category = card.categoria?.trim() || "SEM CATEGORIA";
     if (!groups[category]) groups[category] = [];
     groups[category].push(card);
   });
+
   return Object.entries(groups);
 }
 
@@ -76,15 +68,19 @@ export default function CardGenerator() {
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const [sessionId] = useState(
     () => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   );
+
   const [isDragging, setIsDragging] = useState(false);
   const [showJournal, setShowJournal] = useState(false);
 
   const [coverImage, setCoverImage] = useState<string>("/assets/capa.png");
+  const [headerImage, setHeaderImage] = useState<string>("/assets/header.png");
   const [adImage, setAdImage] = useState<string>("/assets/anuncio.png");
   const [pageBackground, setPageBackground] = useState<string>("#ffffff");
+
   const [footerText, setFooterText] = useState(
     "Ofertas válidas enquanto durarem os estoques. Consulte condições, disponibilidade e regulamento nos canais oficiais."
   );
@@ -93,12 +89,11 @@ export default function CardGenerator() {
 
   const socketRef = useRef<Socket | null>(null);
   const journalRef = useRef<HTMLDivElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const adInputRef = useRef<HTMLInputElement>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const selectedLogoCardRef = useRef<string | null>(null);
 
-  const [logoOverrides, setLogoOverrides] = useState<Record<string, string>>({});
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const headerInputRef = useRef<HTMLInputElement>(null);
+  const adInputRef = useRef<HTMLInputElement>(null);
+
   const [, setLocation] = useLocation();
 
   const generateCardsMutation = trpc.card.generateCards.useMutation();
@@ -113,7 +108,11 @@ export default function CardGenerator() {
     });
 
     socket.on("connect", () => socket.emit("join", sessionId));
-    socket.on("progress", (data: ProgressData) => setProgress(data));
+
+    socket.on("progress", (data: ProgressData) => {
+      setProgress(data);
+    });
+
     socket.on("error", (message: string) => {
       setError(message);
       window.alert(message);
@@ -177,6 +176,7 @@ export default function CardGenerator() {
       });
 
       setResult(data as ProcessResult);
+
       setProgress({
         total: data.totalRows,
         processed: data.processedRows,
@@ -192,40 +192,61 @@ export default function CardGenerator() {
     }
   };
 
-  const changeImage = async (kind: "cover" | "ad", file?: File | null) => {
-    if (!file) return;
+  const changeImage = async (
+    kind: "cover" | "header" | "ad",
+    selectedFile?: File | null
+  ) => {
+    if (!selectedFile) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!selectedFile.type.startsWith("image/")) {
       window.alert("Envie apenas arquivos de imagem.");
       return;
     }
 
-    const dataUrl = await readImageAsDataUrl(file);
+    const dataUrl = await readImageAsDataUrl(selectedFile);
+
     if (kind === "cover") setCoverImage(dataUrl);
-    else setAdImage(dataUrl);
+    if (kind === "header") setHeaderImage(dataUrl);
+    if (kind === "ad") setAdImage(dataUrl);
   };
 
-  const openLogoPicker = (cardKey: string) => {
-    selectedLogoCardRef.current = cardKey;
-    logoInputRef.current?.click();
-  };
+  const handleJournalClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
 
-  const changeLogo = async (file?: File | null) => {
-    if (!file || !selectedLogoCardRef.current) return;
+    const logoContainer = target.closest(".logo") as HTMLElement | null;
+    if (!logoContainer) return;
 
-    if (!file.type.startsWith("image/")) {
-      window.alert("Envie apenas arquivos de imagem.");
-      return;
-    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
 
-    const dataUrl = await readImageAsDataUrl(file);
+    input.onchange = async (changeEvent: Event) => {
+      const inputTarget = changeEvent.target as HTMLInputElement | null;
+      const selectedFile = inputTarget?.files?.[0];
 
-    setLogoOverrides((current) => ({
-      ...current,
-      [selectedLogoCardRef.current as string]: dataUrl,
-    }));
+      if (!selectedFile) return;
 
-    selectedLogoCardRef.current = null;
+      if (!selectedFile.type.startsWith("image/")) {
+        window.alert("Envie apenas arquivos de imagem.");
+        return;
+      }
+
+      const dataUrl = await readImageAsDataUrl(selectedFile);
+
+      let image = logoContainer.querySelector("img") as HTMLImageElement | null;
+
+      if (!image) {
+        image = document.createElement("img");
+        image.alt = "Logo";
+        logoContainer.appendChild(image);
+      }
+
+      image.src = dataUrl;
+      image.style.display = "block";
+    };
+
+    input.click();
   };
 
   const generateJournalPdf = async () => {
@@ -248,7 +269,10 @@ export default function CardGenerator() {
       const response = await fetch("/api/journal/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html: body, jobId: result.jobId }),
+        body: JSON.stringify({
+          html: body,
+          jobId: result.jobId || `journal_${Date.now()}`,
+        }),
       });
 
       const json = await response.json();
@@ -274,7 +298,6 @@ export default function CardGenerator() {
     setShowJournal(false);
     setError(null);
     setIsProcessing(false);
-    setLogoOverrides({});
     setPageBackground("#ffffff");
   };
 
@@ -315,18 +338,18 @@ export default function CardGenerator() {
               <div className="space-y-5">
                 <div
                   onClick={() => document.getElementById("file-input")?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
+                  onDragOver={(event) => {
+                    event.preventDefault();
                     setIsDragging(true);
                   }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
+                  onDragLeave={(event) => {
+                    event.preventDefault();
                     setIsDragging(false);
                   }}
-                  onDrop={(e) => {
-                    e.preventDefault();
+                  onDrop={(event) => {
+                    event.preventDefault();
                     setIsDragging(false);
-                    handleFileSelect(e.dataTransfer.files[0]);
+                    handleFileSelect(event.dataTransfer.files[0]);
                   }}
                   className={`group cursor-pointer rounded-[1.5rem] border-2 border-dashed p-10 text-center transition ${
                     isDragging
@@ -344,7 +367,7 @@ export default function CardGenerator() {
                     id="file-input"
                     type="file"
                     accept=".xlsx"
-                    onChange={(e) => handleFileSelect(e.target.files?.[0])}
+                    onChange={(event) => handleFileSelect(event.target.files?.[0])}
                     className="hidden"
                   />
                 </div>
@@ -385,18 +408,21 @@ export default function CardGenerator() {
             {isProcessing && progress && (
               <div className="space-y-6 py-6 text-center">
                 <Hourglass className="mx-auto h-12 w-12 animate-spin text-sky-400" />
+
                 <div>
                   <h2 className="text-2xl font-black">Processando cards</h2>
                   <p className="text-white/45">
                     {progress.currentCard || `${progress.processed}/${progress.total}`}
                   </p>
                 </div>
+
                 <div className="h-3 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full bg-blue-500 transition-all"
                     style={{ width: `${progress.percentage}%` }}
                   />
                 </div>
+
                 <p className="text-sm text-white/45">
                   {progress.processed} de {progress.total || "..."} cards processados
                 </p>
@@ -406,6 +432,7 @@ export default function CardGenerator() {
             {result && (
               <div className="space-y-5 py-3 text-center">
                 <CheckCircle2 className="mx-auto h-14 w-14 text-teal-300" />
+
                 <div>
                   <h2 className="text-2xl font-black">Cards prontos</h2>
                   <p className="text-white/45">
@@ -448,7 +475,8 @@ export default function CardGenerator() {
               <div>
                 <h2 className="text-2xl font-black">Editor visual do jornal</h2>
                 <p className="text-sm text-white/45">
-                  Cards em HTML, categorias separadas e logos clicáveis.
+                  Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as
+                  imagens.
                 </p>
               </div>
 
@@ -459,7 +487,7 @@ export default function CardGenerator() {
                   <input
                     type="color"
                     value={pageBackground}
-                    onChange={(e) => setPageBackground(e.target.value)}
+                    onChange={(event) => setPageBackground(event.target.value)}
                     className="h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0"
                   />
                 </label>
@@ -477,11 +505,18 @@ export default function CardGenerator() {
 
             <div className="journal-preview-viewport">
               <div className="journal-preview-scaler">
-                <div ref={journalRef} className="journal-root">
+                <div
+                  ref={journalRef}
+                  className="journal-root"
+                  onClick={handleJournalClick}
+                >
                   <div className="journal-page-label">Página 1 — Capa</div>
 
-                  <div className="journal-page journal-cover" onClick={() => coverInputRef.current?.click()}>
-                    <img src={coverImage} />
+                  <div
+                    className="journal-page journal-cover"
+                    onClick={() => coverInputRef.current?.click()}
+                  >
+                    <img src={coverImage} alt="Capa do jornal" />
                     <div className="journal-placeholder">
                       <Pencil className="h-8 w-8" />
                       Clique para escolher capa
@@ -491,8 +526,11 @@ export default function CardGenerator() {
                   <div className="journal-page-label">Página 2 — Cards</div>
 
                   <div className="journal-flow-page" style={{ background: pageBackground }}>
-                    <div className="journal-header">
-                      <img src="/assets/header.png" />
+                    <div
+                      className="journal-header"
+                      onClick={() => headerInputRef.current?.click()}
+                    >
+                      <img src={headerImage} alt="Cabeçalho do jornal" />
                       <span>Cabeçalho</span>
                     </div>
 
@@ -501,36 +539,13 @@ export default function CardGenerator() {
                         <div className="journal-category-bar">{category}</div>
 
                         <div className="journal-grid">
-                          {cards.map((card) => {
-                            const cardKey = `${card.ordem}-${card.htmlName}`;
-                            const logoOverride = logoOverrides[cardKey];
-
-                            return (
-                              <div className="journal-card-wrap" key={cardKey}>
-                                <iframe
-                                  title={cardKey}
-                                  src={card.htmlUrl}
-                                  className="journal-card-frame"
-                                />
-
-                                <button
-                                  type="button"
-                                  className={`journal-logo-hotspot ${
-                                    logoOverride || card.hasLogo ? "has-logo-override" : ""
-                                  }`}
-                                  onClick={() => openLogoPicker(cardKey)}
-                                >
-                                  {logoOverride ? (
-                                    <img src={logoOverride} alt="Logo substituído" />
-                                  ) : card.hasLogo ? (
-                                    <span>Trocar logo</span>
-                                  ) : (
-                                    <span>Adicionar logo</span>
-                                  )}
-                                </button>
-                              </div>
-                            );
-                          })}
+                          {cards.map((card, index) => (
+                            <div
+                              className="journal-card-wrap"
+                              key={`${card.ordem}-${card.tipo}-${index}`}
+                              dangerouslySetInnerHTML={{ __html: card.html }}
+                            />
+                          ))}
                         </div>
                       </section>
                     ))}
@@ -539,7 +554,7 @@ export default function CardGenerator() {
                       className="journal-footer-text"
                       contentEditable
                       suppressContentEditableWarning
-                      onBlur={(e) => setFooterText(e.currentTarget.innerText)}
+                      onBlur={(event) => setFooterText(event.currentTarget.innerText)}
                     >
                       {footerText}
                     </div>
@@ -547,8 +562,11 @@ export default function CardGenerator() {
 
                   <div className="journal-page-label">Página 3 — Anúncio</div>
 
-                  <div className="journal-page journal-cover" onClick={() => adInputRef.current?.click()}>
-                    <img src={adImage} />
+                  <div
+                    className="journal-page journal-cover"
+                    onClick={() => adInputRef.current?.click()}
+                  >
+                    <img src={adImage} alt="Anúncio do jornal" />
                     <div className="journal-placeholder">
                       <Pencil className="h-8 w-8" />
                       Clique para escolher anúncio
@@ -563,7 +581,15 @@ export default function CardGenerator() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => changeImage("cover", e.target.files?.[0])}
+              onChange={(event) => changeImage("cover", event.target.files?.[0])}
+            />
+
+            <input
+              ref={headerInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => changeImage("header", event.target.files?.[0])}
             />
 
             <input
@@ -571,15 +597,7 @@ export default function CardGenerator() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => changeImage("ad", e.target.files?.[0])}
-            />
-
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => changeLogo(e.target.files?.[0])}
+              onChange={(event) => changeImage("ad", event.target.files?.[0])}
             />
           </section>
         )}
@@ -612,6 +630,8 @@ const journalCss = `
     justify-content:center;
     align-items:flex-start;
     flex-shrink:0;
+    transform:scale(.28);
+    transform-origin:top center;
   }
 
   .journal-root{
@@ -620,8 +640,6 @@ const journalCss = `
     background:#eef4ff;
     color:#111;
     font-family:Inter,Arial,sans-serif;
-    transform:scale(.28);
-    transform-origin:top center;
   }
 
   .journal-page-label{
@@ -650,6 +668,13 @@ const journalCss = `
     page-break-after:always;
   }
 
+  .journal-cover,
+  .journal-header,
+  .journal-card-wrap,
+  .journal-card-wrap .logo{
+    cursor:pointer;
+  }
+
   .journal-cover img{
     position:absolute;
     inset:0;
@@ -673,6 +698,7 @@ const journalCss = `
     color:#111;
     background:rgba(255,255,255,.72);
     z-index:1;
+    pointer-events:none;
   }
 
   .journal-flow-page{
@@ -709,6 +735,7 @@ const journalCss = `
   .journal-header span{
     position:relative;
     z-index:1;
+    pointer-events:none;
   }
 
   .journal-category{
@@ -716,7 +743,7 @@ const journalCss = `
   }
 
   .journal-category-bar{
-    width:calc(100% - 240px);
+    width:calc(100% - 160px);
     margin:70px auto 30px auto;
     background:#0f6bc8;
     color:white;
@@ -753,51 +780,16 @@ const journalCss = `
     box-shadow:0 16px 32px rgba(0,0,0,.10);
   }
 
-  .journal-card-frame{
-    width:700px;
-    height:1058px;
-    border:none;
-    background:#fff;
-    display:block;
+  .journal-card-wrap .logo{
+    cursor:pointer !important;
   }
 
-  .journal-logo-hotspot{
-    position:absolute;
-    left:48px;
-    top:48px;
-    width:150px;
-    height:88px;
-    border:2px dashed rgba(160,160,160,.75);
+  .journal-card-wrap .logo:empty,
+  .journal-card-wrap .logo:not(:has(img)),
+  .journal-card-wrap .logo img[src=""]{
+    background:#f1f1f1;
+    border:2px dashed #d2d2d2;
     border-radius:14px;
-    background:rgba(238,238,238,.95);
-    color:#777;
-    font-size:13px;
-    font-weight:800;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    padding:6px;
-    cursor:pointer;
-    overflow:hidden;
-    z-index:5;
-  }
-
-  .journal-logo-hotspot:hover{
-    border-color:#0f6bc8;
-    color:#0f6bc8;
-    background:#fff;
-  }
-
-  .journal-logo-hotspot img{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:block;
-  }
-
-  .journal-logo-hotspot.has-logo-override{
-    background:rgba(255,255,255,.82);
   }
 
   .journal-footer-text{

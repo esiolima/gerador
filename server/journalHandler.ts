@@ -44,7 +44,6 @@ export function setupJournalRoute(app: express.Express) {
     const htmlPath = assertInsideOutput(path.join(jobDir, "jornal_editado.html"));
     const pdfPath = assertInsideOutput(path.join(jobDir, "jornal_gerado.pdf"));
 
-    // 🔥 BASE FIX (IMPORTANTE PARA FONTES + IMAGENS)
     const finalHtml = html.includes("<base")
       ? html
       : html.replace(
@@ -70,7 +69,6 @@ export function setupJournalRoute(app: express.Express) {
 
       const page = await browser.newPage();
 
-      // 🔥 viewport maior evita corte
       await page.setViewport({
         width: 1200,
         height: 2000,
@@ -82,34 +80,38 @@ export function setupJournalRoute(app: express.Express) {
         timeout: 120000,
       });
 
-      // 🔥 PREPARAÇÃO DO DOCUMENTO
       await page.evaluate(async () => {
+        document.querySelectorAll("template[shadowrootmode]").forEach((template) => {
+          const mode = template.getAttribute("shadowrootmode") || "open";
+          const parent = template.parentElement;
 
-        // remove labels de preview
-        document.querySelectorAll(".journal-page-label").forEach(el => el.remove());
+          if (!parent || parent.shadowRoot) return;
 
-        // 🔥 remove escala (ESSENCIAL)
-        const scaler = document.querySelector(".journal-preview-scaler") as HTMLElement;
+          const shadow = parent.attachShadow({ mode: mode as ShadowRootMode });
+          shadow.appendChild(template.content.cloneNode(true));
+          template.remove();
+        });
+
+        document.querySelectorAll(".journal-page-label").forEach((el) => el.remove());
+
+        const scaler = document.querySelector(".journal-preview-scaler") as HTMLElement | null;
         if (scaler) {
           scaler.style.transform = "none";
         }
 
-        const root = document.querySelector(".journal-root") as HTMLElement;
+        const root = document.querySelector(".journal-root") as HTMLElement | null;
         if (root) {
           root.style.transform = "none";
           root.style.width = "1080px";
           root.style.margin = "0 auto";
         }
 
-        // 🔥 força layout
         document.body.style.margin = "0";
         document.body.style.padding = "0";
 
-        // aguarda fontes
         // @ts-ignore
         if (document.fonts?.ready) await document.fonts.ready;
 
-        // aguarda imagens
         const images = Array.from(document.images);
         await Promise.all(
           images.map((img) => {
@@ -123,9 +125,8 @@ export function setupJournalRoute(app: express.Express) {
         );
       });
 
-      // 🔥 pega altura REAL
       const dimensions = await page.evaluate(() => {
-        const root = document.querySelector(".journal-root") as HTMLElement;
+        const root = document.querySelector(".journal-root") as HTMLElement | null;
 
         const height = root
           ? Math.ceil(root.scrollHeight)
@@ -148,6 +149,7 @@ export function setupJournalRoute(app: express.Express) {
           bottom: "0px",
           left: "0px",
         },
+        preferCSSPageSize: false,
       });
 
       await page.close();
@@ -157,14 +159,13 @@ export function setupJournalRoute(app: express.Express) {
         pdfPath,
         pdfUrl: `/api/journal/download?path=${encodeURIComponent(pdfPath)}`,
       });
-
     } catch (error) {
       return res.status(500).json({
-        error: error instanceof Error
-          ? error.message
-          : "Erro ao gerar PDF do jornal.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro ao gerar PDF do jornal.",
       });
-
     } finally {
       if (browser) await browser.close();
     }
@@ -185,7 +186,6 @@ export function setupJournalRoute(app: express.Express) {
       }
 
       return res.download(resolved, path.basename(resolved));
-
     } catch (error) {
       return res.status(403).json({
         error: error instanceof Error ? error.message : "Acesso negado.",

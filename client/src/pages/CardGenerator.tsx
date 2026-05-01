@@ -265,6 +265,8 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
   return `${clone.outerHTML}${activateDeclarativeShadowDom}`;
 }
 
+const PAGE_BACKGROUND_STORAGE_KEY = "jornal_page_background";
+
 export default function CardGenerator() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -282,7 +284,11 @@ export default function CardGenerator() {
   const [coverImage, setCoverImage] = useState<string>("/assets/capa.png");
   const [headerImage, setHeaderImage] = useState<string>("/assets/header.png");
   const [adImage, setAdImage] = useState<string>("/assets/anuncio.png");
-  const [pageBackground, setPageBackground] = useState<string>("#ffffff");
+  const [pageBackground, setPageBackground] = useState<string>(() => {
+    if (typeof window === "undefined") return "#ffffff";
+
+    return window.localStorage.getItem(PAGE_BACKGROUND_STORAGE_KEY) || "#ffffff";
+  });
 
   const [footerText, setFooterText] = useState(
     "Ofertas válidas enquanto durarem os estoques. Consulte condições, disponibilidade e regulamento nos canais oficiais."
@@ -328,6 +334,10 @@ export default function CardGenerator() {
       socket.disconnect();
     };
   }, [sessionId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PAGE_BACKGROUND_STORAGE_KEY, pageBackground);
+  }, [pageBackground]);
 
   const handleFileSelect = (selectedFile: File | null | undefined) => {
     if (!selectedFile) return;
@@ -464,7 +474,6 @@ export default function CardGenerator() {
     setShowJournal(false);
     setError(null);
     setIsProcessing(false);
-    setPageBackground("#ffffff");
   };
 
   return (
@@ -804,7 +813,7 @@ export default function CardGenerator() {
     display:flex;
     justify-content:center;
     align-items:flex-start;
-    background:#020817;
+    background:#ffffff;
     padding:24px;
     border-radius:24px;
     border:1px solid rgba(255,255,255,.10);
@@ -836,8 +845,9 @@ export default function CardGenerator() {
     display:flex;
     align-items:center;
     justify-content:center;
-    background:#000;
-    color:#fff;
+    background:#ffffff;
+    color:#000000;
+    border-bottom:1px solid #e5e7eb;
     font-size:22px;
     font-weight:900;
     letter-spacing:.04em;

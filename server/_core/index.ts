@@ -79,6 +79,7 @@ async function startServer() {
 
   app.use("/output", express.static(path.resolve("output")));
   app.use("/assets", express.static(path.resolve("assets")));
+  app.use("/fonts", express.static(path.resolve("fonts")));
 
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

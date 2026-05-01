@@ -4,6 +4,7 @@ import fs from "fs";
 import puppeteer from "puppeteer-core";
 
 const OUTPUT_DIR = path.resolve("output");
+const PROJECT_ROOT = path.resolve();
 
 function assertInsideOutput(filePath: string) {
   const resolved = path.resolve(filePath);
@@ -25,6 +26,27 @@ function getChromiumExecutablePath() {
   );
 }
 
+function prepareHtmlForPdf(html: string) {
+  let preparedHtml = html.includes("<base")
+    ? html
+    : html.replace(
+        "<head>",
+        `<head><base href="file://${PROJECT_ROOT}/">`
+      );
+
+  preparedHtml = preparedHtml.replaceAll(
+    'src="/assets/',
+    `src="file://${path.join(PROJECT_ROOT, "assets").replace(/\\/g, "/")}/`
+  );
+
+  preparedHtml = preparedHtml.replaceAll(
+    'src="/fonts/',
+    `src="file://${path.join(PROJECT_ROOT, "fonts").replace(/\\/g, "/")}/`
+  );
+
+  return preparedHtml;
+}
+
 export function setupJournalRoute(app: express.Express) {
   app.post("/api/journal/pdf", async (req, res) => {
     const { html, jobId } = req.body ?? {};
@@ -44,13 +66,7 @@ export function setupJournalRoute(app: express.Express) {
     const htmlPath = assertInsideOutput(path.join(jobDir, "jornal_editado.html"));
     const pdfPath = assertInsideOutput(path.join(jobDir, "jornal_gerado.pdf"));
 
-    const finalHtml = html.includes("<base")
-      ? html
-      : html.replace(
-          "<head>",
-          `<head><base href="file://${path.resolve()}/">`
-        );
-
+    const finalHtml = prepareHtmlForPdf(html);
     fs.writeFileSync(htmlPath, finalHtml, "utf8");
 
     let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
@@ -63,6 +79,7 @@ export function setupJournalRoute(app: express.Express) {
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--font-render-hinting=none",
+          "--allow-file-access-from-files",
         ],
         headless: true,
       });
@@ -94,11 +111,25 @@ export function setupJournalRoute(app: express.Express) {
 
         document.querySelectorAll(".journal-page-label").forEach((el) => el.remove());
 
+        const viewport = document.querySelector(".journal-preview-viewport") as HTMLElement | null;
+        if (viewport) {
+          viewport.style.width = "2400px";
+          viewport.style.maxHeight = "none";
+          viewport.style.overflow = "visible";
+          viewport.style.display = "block";
+          viewport.style.padding = "0";
+          viewport.style.border = "0";
+          viewport.style.borderRadius = "0";
+          viewport.style.background = "transparent";
+        }
+
         const scaler = document.querySelector(".journal-preview-scaler") as HTMLElement | null;
         if (scaler) {
           scaler.style.transform = "none";
+          scaler.style.transformOrigin = "top left";
           scaler.style.width = "2400px";
-          scaler.style.minHeight = "auto";
+          scaler.style.height = "auto";
+          scaler.style.minHeight = "0";
           scaler.style.display = "block";
         }
 
@@ -112,8 +143,11 @@ export function setupJournalRoute(app: express.Express) {
 
         document.body.style.margin = "0";
         document.body.style.padding = "0";
+        document.body.style.background = "transparent";
+
         document.documentElement.style.margin = "0";
         document.documentElement.style.padding = "0";
+        document.documentElement.style.background = "transparent";
 
         const style = document.createElement("style");
         style.innerHTML = `
@@ -124,25 +158,52 @@ export function setupJournalRoute(app: express.Express) {
 
           html,
           body {
-            width: 2400px;
+            width: 2400px !important;
             margin: 0 !important;
             padding: 0 !important;
             background: transparent !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
+          .journal-preview-viewport,
+          .journal-preview-scaler,
           .journal-root {
             width: 2400px !important;
+            max-height: none !important;
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            display: block !important;
             margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
             background: transparent !important;
+            transform: none !important;
+            box-shadow: none !important;
           }
 
-          .journal-page,
+          .journal-page {
+            width: 2400px !important;
+            height: 4267px !important;
+            min-height: 4267px !important;
+            max-height: 4267px !important;
+            overflow: hidden !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
           .journal-flow-page {
             width: 2400px !important;
             min-height: 4267px !important;
+            height: auto !important;
+            overflow: visible !important;
             page-break-after: always !important;
             break-after: page !important;
-            overflow: hidden !important;
+            margin: 0 !important;
           }
 
           .journal-page:last-child,
@@ -151,17 +212,18 @@ export function setupJournalRoute(app: express.Express) {
             break-after: auto !important;
           }
 
-          .journal-preview-viewport,
-          .journal-preview-scaler {
-            width: 2400px !important;
-            max-height: none !important;
-            overflow: visible !important;
+          .journal-cover img,
+          .journal-header img {
             display: block !important;
-            padding: 0 !important;
-            border: none !important;
-            border-radius: 0 !important;
-            background: transparent !important;
-            transform: none !important;
+          }
+
+          .journal-placeholder {
+            z-index: 0 !important;
+          }
+
+          .journal-cover img[src],
+          .journal-header img[src] {
+            z-index: 2 !important;
           }
         `;
         document.head.appendChild(style);
@@ -170,16 +232,20 @@ export function setupJournalRoute(app: express.Express) {
         if (document.fonts?.ready) await document.fonts.ready;
 
         const images = Array.from(document.images);
+
         await Promise.all(
           images.map((img) => {
-            if (img.complete) return Promise.resolve();
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
 
             return new Promise<void>((resolve) => {
               img.onload = () => resolve();
               img.onerror = () => resolve();
+              setTimeout(() => resolve(), 8000);
             });
           })
         );
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
       });
 
       await page.pdf({

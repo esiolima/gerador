@@ -102,6 +102,20 @@ export function setupJournalRoute(app: express.Express) {
 
       // Obter as alturas reais de cada página para gerar o PDF corretamente
       const pageDimensions = await page.evaluate(async () => {
+        // Ativar Shadow DOM Declarativo
+        document.querySelectorAll("template[shadowrootmode]").forEach((template) => {
+          const mode = template.getAttribute("shadowrootmode") || "open";
+          const parent = template.parentElement;
+          if (!parent || parent.shadowRoot) return;
+          if (typeof parent.setHTMLUnsafe === 'function') {
+            parent.setHTMLUnsafe(template.innerHTML);
+          } else {
+            const shadow = parent.attachShadow({ mode: mode as ShadowRootMode });
+            shadow.appendChild(template.content.cloneNode(true));
+            template.remove();
+          }
+        });
+
         // Remover labels de preview
         document.querySelectorAll(".journal-page-label").forEach((el) => el.remove());
 

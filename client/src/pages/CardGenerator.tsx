@@ -774,7 +774,23 @@ export default function CardGenerator() {
   );
 }
 
-const journalCss = `
+  const journalCss = `
+  @font-face {
+    font-family: 'Inter';
+    src: url('/fonts/Inter-Regular.ttf') format('truetype');
+    font-weight: 400;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('/fonts/Inter-Bold.ttf') format('truetype');
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: 'Inter';
+    src: url('/fonts/Inter-Black.ttf') format('truetype');
+    font-weight: 900;
+  }
+
   .journal-preview-viewport{
     width:100%;
     max-height:82vh;

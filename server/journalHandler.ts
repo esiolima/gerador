@@ -65,7 +65,6 @@ export function setupJournalRoute(app: express.Express) {
 
     const htmlPath = assertInsideOutput(path.join(jobDir, "jornal_editado.html"));
     
-    // Usar o nome do arquivo original se fornecido, caso contrário usar o padrão
     const basePdfName = fileName ? `${fileName.replace(/\.[^/.]+$/, "")}.pdf` : "jornal_gerado.pdf";
     const pdfPath = assertInsideOutput(path.join(jobDir, basePdfName));
 
@@ -89,9 +88,10 @@ export function setupJournalRoute(app: express.Express) {
 
       const page = await browser.newPage();
 
+      // Viewport inicial largo o suficiente
       await page.setViewport({
         width: 2400,
-        height: 4267,
+        height: 5000,
         deviceScaleFactor: 1,
       });
 
@@ -100,9 +100,9 @@ export function setupJournalRoute(app: express.Express) {
         timeout: 120000,
       });
 
-      // Obter as alturas reais de cada página para gerar o PDF corretamente
-      const pageDimensions = await page.evaluate(async () => {
-        // Ativar Shadow DOM Declarativo
+      // Preparar o DOM e calcular a altura da página de cards
+      const flowPageHeight = await page.evaluate(async () => {
+        // Ativar Shadow DOM
         document.querySelectorAll("template[shadowrootmode]").forEach((template) => {
           const mode = template.getAttribute("shadowrootmode") || "open";
           const parent = template.parentElement;
@@ -116,97 +116,81 @@ export function setupJournalRoute(app: express.Express) {
           }
         });
 
-        // Remover labels de preview
         document.querySelectorAll(".journal-page-label").forEach((el) => el.remove());
 
-        // Resetar estilos de preview para impressão
         const viewport = document.querySelector(".journal-preview-viewport") as HTMLElement | null;
         if (viewport) {
-          viewport.style.width = "2400px";
-          viewport.style.maxHeight = "none";
-          viewport.style.overflow = "visible";
-          viewport.style.display = "block";
-          viewport.style.padding = "0";
-          viewport.style.border = "0";
-          viewport.style.borderRadius = "0";
-          viewport.style.background = "transparent";
+          viewport.style.cssText = "width:2400px !important; max-height:none !important; overflow:visible !important; display:block !important; padding:0 !important; border:0 !important; background:transparent !important;";
         }
 
         const scaler = document.querySelector(".journal-preview-scaler") as HTMLElement | null;
         if (scaler) {
-          scaler.style.transform = "none";
-          scaler.style.width = "2400px";
-          scaler.style.height = "auto";
-          scaler.style.minHeight = "0";
-          scaler.style.display = "block";
+          scaler.style.cssText = "transform:none !important; width:2400px !important; height:auto !important; min-height:0 !important; display:block !important;";
         }
 
         const root = document.querySelector(".journal-root") as HTMLElement | null;
         if (root) {
-          root.style.transform = "none";
-          root.style.width = "2400px";
-          root.style.margin = "0";
-          root.style.background = "transparent";
+          root.style.cssText = "width:2400px !important; margin:0 !important; background:transparent !important;";
         }
 
-        document.body.style.margin = "0";
-        document.body.style.padding = "0";
-        document.body.style.background = "transparent";
-
-        // Coletar dimensões de cada página
-        const pages = Array.from(document.querySelectorAll('.journal-page, .journal-flow-page'));
-        const dimensions = pages.map(p => ({
-          height: p.scrollHeight,
-          width: 2400
-        }));
+        // Forçar as páginas a não quebrarem internamente
+        const flowPage = document.querySelector('.journal-flow-page') as HTMLElement | null;
+        const height = flowPage ? flowPage.scrollHeight : 4267;
 
         // @ts-ignore
         if (document.fonts?.ready) await document.fonts.ready;
 
-        const images = Array.from(document.images);
-        await Promise.all(
-          images.map((img) => {
-            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-            return new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-              setTimeout(() => resolve(), 8000);
-            });
-          })
-        );
-
-        return dimensions;
+        return height;
       });
 
-      // Injetar CSS de impressão dinâmico baseado nas dimensões reais
+      // Injetar CSS de impressão agressivo para evitar quebras automáticas
       await page.addStyleTag({
         content: `
           @page { margin: 0; }
-          body { margin: 0; padding: 0; background: transparent !important; }
+          html, body { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            width: 2400px !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+          }
           .journal-page { 
             width: 2400px !important; 
             height: 4267px !important; 
+            position: relative !important;
             overflow: hidden !important;
             page-break-after: always !important;
+            break-after: page !important;
+            display: block !important;
           }
           .journal-flow-page { 
             width: 2400px !important; 
-            height: auto !important; 
+            height: ${flowPageHeight}px !important; 
             min-height: 4267px !important;
+            position: relative !important;
             overflow: visible !important;
             page-break-after: always !important;
+            break-after: page !important;
+            display: block !important;
+          }
+          /* Impedir quebras dentro dos cards */
+          .journal-grid, .journal-card-wrap {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           .journal-page:last-child, .journal-flow-page:last-child {
             page-break-after: auto !important;
+            break-after: auto !important;
           }
         `
       });
 
-      // Gerar o PDF com preferCSSPageSize para respeitar as alturas variadas
+      // Gerar o PDF respeitando o CSS injetado
       await page.pdf({
         path: pdfPath,
         printBackground: true,
-        preferCSSPageSize: true,
+        preferCSSPageSize: true, // Crucial para respeitar as alturas variadas do CSS
+        width: "2400px",
         margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" }
       });
 

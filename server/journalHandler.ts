@@ -70,8 +70,8 @@ export function setupJournalRoute(app: express.Express) {
       const page = await browser.newPage();
 
       await page.setViewport({
-        width: 1200,
-        height: 2000,
+        width: 2400,
+        height: 4267,
         deviceScaleFactor: 1,
       });
 
@@ -97,17 +97,74 @@ export function setupJournalRoute(app: express.Express) {
         const scaler = document.querySelector(".journal-preview-scaler") as HTMLElement | null;
         if (scaler) {
           scaler.style.transform = "none";
+          scaler.style.width = "2400px";
+          scaler.style.minHeight = "auto";
+          scaler.style.display = "block";
         }
 
         const root = document.querySelector(".journal-root") as HTMLElement | null;
         if (root) {
           root.style.transform = "none";
-          root.style.width = "1080px";
-          root.style.margin = "0 auto";
+          root.style.width = "2400px";
+          root.style.margin = "0";
+          root.style.background = "transparent";
         }
 
         document.body.style.margin = "0";
         document.body.style.padding = "0";
+        document.documentElement.style.margin = "0";
+        document.documentElement.style.padding = "0";
+
+        const style = document.createElement("style");
+        style.innerHTML = `
+          @page {
+            size: 2400px 4267px;
+            margin: 0;
+          }
+
+          html,
+          body {
+            width: 2400px;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: transparent !important;
+          }
+
+          .journal-root {
+            width: 2400px !important;
+            margin: 0 !important;
+            background: transparent !important;
+          }
+
+          .journal-page,
+          .journal-flow-page {
+            width: 2400px !important;
+            min-height: 4267px !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            overflow: hidden !important;
+          }
+
+          .journal-page:last-child,
+          .journal-flow-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+
+          .journal-preview-viewport,
+          .journal-preview-scaler {
+            width: 2400px !important;
+            max-height: none !important;
+            overflow: visible !important;
+            display: block !important;
+            padding: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            transform: none !important;
+          }
+        `;
+        document.head.appendChild(style);
 
         // @ts-ignore
         if (document.fonts?.ready) await document.fonts.ready;
@@ -125,31 +182,18 @@ export function setupJournalRoute(app: express.Express) {
         );
       });
 
-      const dimensions = await page.evaluate(() => {
-        const root = document.querySelector(".journal-root") as HTMLElement | null;
-
-        const height = root
-          ? Math.ceil(root.scrollHeight)
-          : Math.ceil(document.documentElement.scrollHeight);
-
-        return {
-          width: 1080,
-          height: Math.max(height, 1920),
-        };
-      });
-
       await page.pdf({
         path: pdfPath,
         printBackground: true,
-        width: `${dimensions.width}px`,
-        height: `${dimensions.height}px`,
+        width: "2400px",
+        height: "4267px",
         margin: {
           top: "0px",
           right: "0px",
           bottom: "0px",
           left: "0px",
         },
-        preferCSSPageSize: false,
+        preferCSSPageSize: true,
       });
 
       await page.close();

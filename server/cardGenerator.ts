@@ -400,129 +400,133 @@ export class CardGenerator extends EventEmitter {
     let processed = 0;
     const cards: GeneratedCard[] = [];
 
-    for (const [index, row] of rows.entries()) {
-      const tipo = this.normalizeType(row.tipo);
-      const templatePath = path.join(TEMPLATES_DIR, `${tipo}.html`);
+    const BATCH_SIZE = 3; // Processar 3 cards por vez para economizar memória
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(batch.map(async (row, batchIndex) => {
+        const index = i + batchIndex;
+        const tipo = this.normalizeType(row.tipo);
+        const templatePath = path.join(TEMPLATES_DIR, `${tipo}.html`);
 
-      if (!fs.existsSync(templatePath)) {
-        throw new Error(`Template não encontrado: templates/${tipo}.html`);
-      }
+        if (!fs.existsSync(templatePath)) {
+          throw new Error(`Template não encontrado: templates/${tipo}.html`);
+        }
 
-      const logoFile = this.findLogoFile(row.logo);
-      const logoBase64 = logoFile ? this.imageToBase64(path.join(LOGOS_DIR, logoFile)) : "";
-      const hasLogo = Boolean(logoBase64);
+        const logoFile = this.findLogoFile(row.logo);
+        const logoBase64 = logoFile ? this.imageToBase64(path.join(LOGOS_DIR, logoFile)) : "";
+        const hasLogo = Boolean(logoBase64);
 
-      const seloRaw = String(row.selo ?? "").trim().toLowerCase();
-      const seloBase64 = seloRaw
-        ? this.imageToBase64(
-            path.join(
-              SELOS_DIR,
-              seloRaw === "nova"
-                ? "acaonova.png"
-                : seloRaw === "renovada"
-                  ? "acaorenovada.png"
-                  : "blank.png"
+        const seloRaw = String(row.selo ?? "").trim().toLowerCase();
+        const seloBase64 = seloRaw
+          ? this.imageToBase64(
+              path.join(
+                SELOS_DIR,
+                seloRaw === "nova"
+                  ? "acaonova.png"
+                  : seloRaw === "renovada"
+                    ? "acaorenovada.png"
+                    : "blank.png"
+              )
             )
-          )
-        : "";
+          : "";
 
-      let html = fs.readFileSync(templatePath, "utf8");
+        let html = fs.readFileSync(templatePath, "utf8");
 
-      html = this.replacePlaceholders(html, row, tipo, logoBase64, seloBase64);
-      html = this.injectFittingHelpers(html);
+        html = this.replacePlaceholders(html, row, tipo, logoBase64, seloBase64);
+        html = this.injectFittingHelpers(html);
 
-      const ordemFinal =
-        row.ordem && String(row.ordem).trim() !== ""
-          ? String(row.ordem).trim()
-          : String(index + 1);
+        const ordemFinal =
+          row.ordem && String(row.ordem).trim() !== ""
+            ? String(row.ordem).trim()
+            : String(index + 1);
 
-      const categoriaRaw =
-        row.categoria && String(row.categoria).trim() !== ""
-          ? String(row.categoria).trim()
-          : "sem-categoria";
+        const categoriaRaw =
+          row.categoria && String(row.categoria).trim() !== ""
+            ? String(row.categoria).trim()
+            : "sem-categoria";
 
-      const categoriaSlug = this.sanitizeFileName(categoriaRaw);
-      const safeOrdem = this.sanitizeFileName(ordemFinal);
+        const categoriaSlug = this.sanitizeFileName(categoriaRaw);
+        const safeOrdem = this.sanitizeFileName(ordemFinal);
 
-      const pdfName = `${safeOrdem}_${tipo}_${categoriaSlug}.pdf`;
-      const pngName = `${safeOrdem}_${tipo}_${categoriaSlug}.png`;
-      const htmlName = `${safeOrdem}_${tipo}_${categoriaSlug}.html`;
+        const pdfName = `${safeOrdem}_${tipo}_${categoriaSlug}.pdf`;
+        const pngName = `${safeOrdem}_${tipo}_${categoriaSlug}.png`;
+        const htmlName = `${safeOrdem}_${tipo}_${categoriaSlug}.html`;
 
-      const pdfPath = path.join(jobDir, pdfName);
-      const pngPath = path.join(jobDir, pngName);
-      const htmlPath = path.join(jobDir, htmlName);
-      const tmpHtmlPath = path.join(TMP_DIR, `${jobId}_card_${index + 1}.html`);
+        const pdfPath = path.join(jobDir, pdfName);
+        const pngPath = path.join(jobDir, pngName);
+        const htmlPath = path.join(jobDir, htmlName);
+        const tmpHtmlPath = path.join(TMP_DIR, `${jobId}_card_${index + 1}.html`);
 
-      fs.writeFileSync(tmpHtmlPath, html, "utf8");
-      fs.writeFileSync(htmlPath, html, "utf8");
+        fs.writeFileSync(tmpHtmlPath, html, "utf8");
+        fs.writeFileSync(htmlPath, html, "utf8");
 
-      const page = await this.browser.newPage();
+        const page = await this.browser!.newPage();
 
-      await page.setViewport({
-        width: 700,
-        height: 1058,
-        deviceScaleFactor: 2,
-      });
+        await page.setViewport({
+          width: 700,
+          height: 1058,
+          deviceScaleFactor: 2,
+        });
 
-      await page.goto(`file://${tmpHtmlPath}`, {
-        waitUntil: "networkidle0",
-        timeout: 120000,
-      });
+        await page.goto(`file://${tmpHtmlPath}`, {
+          waitUntil: "networkidle0",
+          timeout: 120000,
+        });
 
-      await this.waitForPageReady(page);
+        await this.waitForPageReady(page);
 
-      await page.pdf({
-        path: pdfPath,
-        width: "700px",
-        height: "1058px",
-        printBackground: true,
-        margin: {
-          top: "0px",
-          right: "0px",
-          bottom: "0px",
-          left: "0px",
-        },
-      });
+        await page.pdf({
+          path: pdfPath,
+          width: "700px",
+          height: "1058px",
+          printBackground: true,
+          margin: {
+            top: "0px",
+            right: "0px",
+            bottom: "0px",
+            left: "0px",
+          },
+        });
 
-      await page.screenshot({
-        path: pngPath,
-        type: "png",
-        fullPage: false,
-      });
+        await page.screenshot({
+          path: pngPath,
+          type: "png",
+          fullPage: false,
+        });
 
-      await page.close();
+        await page.close();
 
-      processed++;
+        processed++;
 
-      const card: GeneratedCard = {
-        ordem: ordemFinal,
-        tipo,
-        categoria: categoriaRaw,
-        categoriaSlug,
-        texto: String(row.texto ?? ""),
-        valor: String(row.valor ?? ""),
-        cupom: String(row.cupom ?? ""),
-        logoFile,
-        hasLogo,
-        pdfName,
-        pngName,
-        htmlName,
-        pdfUrl: `/output/${jobId}/${pdfName}`,
-        pngUrl: `/output/${jobId}/${pngName}`,
-        htmlUrl: `/output/${jobId}/${htmlName}`,
+        const card: GeneratedCard = {
+          ordem: ordemFinal,
+          tipo,
+          categoria: categoriaRaw,
+          categoriaSlug,
+          texto: String(row.texto ?? ""),
+          valor: String(row.valor ?? ""),
+          cupom: String(row.cupom ?? ""),
+          logoFile,
+          hasLogo,
+          pdfName,
+          pngName,
+          htmlName,
+          pdfUrl: `/output/${jobId}/${pdfName}`,
+          pngUrl: `/output/${jobId}/${pngName}`,
+          htmlUrl: `/output/${jobId}/${htmlName}`,
+          html
+        };
 
-        // 🔥 ESSA LINHA RESOLVE TUDO
-        html
-     };
+        cards.push(card);
 
-      cards.push(card);
-
-      this.emit("progress", {
-        processed,
-        total,
-        percentage: Math.round((processed / total) * 100),
-        currentCard: `${processed}/${total} cards processados`,
-      });
+        this.emit("progress", {
+          processed,
+          total,
+          percentage: Math.round((processed / total) * 100),
+          currentCard: `${processed}/${total} cards processados`,
+        });
+      }));
     }
 
     const baseName = originalFileName

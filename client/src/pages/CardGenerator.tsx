@@ -242,6 +242,7 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
     const originalHost = originalHosts[index];
     const shadowHtml = originalHost?.shadowRoot?.innerHTML || "";
 
+    // Usando template para compatibilidade máxima durante a serialização
     clonedHost.innerHTML = `
       <template shadowrootmode="open">
         ${shadowHtml}
@@ -251,13 +252,25 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
 
   const activateDeclarativeShadowDom = `
     <script>
+      // Método moderno e seguro para ativar Shadow DOM Declarativo
       document.querySelectorAll("template[shadowrootmode]").forEach(function(template) {
-        var mode = template.getAttribute("shadowrootmode");
+        var mode = template.getAttribute("shadowrootmode") || "open";
         var parent = template.parentNode;
         if (!parent || parent.shadowRoot) return;
-        var shadow = parent.attachShadow({ mode: mode || "open" });
-        shadow.appendChild(template.content.cloneNode(true));
-        template.remove();
+        
+        try {
+          // Tenta usar o método moderno se disponível
+          if (typeof parent.setHTMLUnsafe === 'function') {
+            parent.setHTMLUnsafe(template.innerHTML);
+          } else {
+            // Fallback para navegadores que ainda não suportam setHTMLUnsafe
+            var shadow = parent.attachShadow({ mode: mode });
+            shadow.appendChild(template.content.cloneNode(true));
+            template.remove();
+          }
+        } catch (e) {
+          console.error("Erro ao ativar Shadow DOM:", e);
+        }
       });
     </script>
   `;
@@ -835,7 +848,7 @@ export default function CardGenerator() {
   .journal-root{
     width:2400px;
     margin:0 auto;
-    background:#eef4ff;
+    background:#f3f4f6; /* Fundo cinza claro para a raiz do jornal */
     color:#111;
     font-family:Inter,Arial,sans-serif;
   }
@@ -859,12 +872,14 @@ export default function CardGenerator() {
     position:relative;
     width:2400px;
     height:4267px;
-    background:#f4f8ff;
+    background:#ffffff; /* Páginas brancas para contraste */
     overflow:hidden;
     display:flex;
     align-items:center;
     justify-content:center;
     page-break-after:always;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.05); /* Sombra suave nas páginas */
+    margin-bottom: 40px;
   }
 
   .journal-cover,
@@ -903,7 +918,10 @@ export default function CardGenerator() {
     width:2400px;
     min-height:4267px;
     padding-bottom:90px;
+    background:#ffffff; /* Fundo branco para a página de cards */
     page-break-after:always;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+    margin-bottom: 40px;
   }
 
   .journal-header{

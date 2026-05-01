@@ -167,7 +167,7 @@ body {
   margin-top: 10px;
   margin-bottom: 20px;
   width: 620px;
-  height: 110px; /* Altura reduzida para ficar proporcional à palavra CUPOM */
+  height: 110px;
   background: #16A7E0;
   border-radius: 16px;
   display: flex;
@@ -195,20 +195,27 @@ body {
 
 /* CÓDIGO */
 .cupom-codigo {
-  flex-grow: 1;
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 40px; /* Aumentado para garantir que o texto não encoste nas bordas */
+
+  /* margem interna mínima igual dos dois lados */
+  padding-left: 45px;
+  padding-right: 45px;
+
   overflow: hidden;
   text-align: center;
 }
 
 /* TEXTO DO CUPOM */
 #cupom-text {
+  display: block;
+  max-width: 100%;
   font-weight: 900;
   color: #ffffff;
-  font-size: 72px; /* Tamanho inicial mais equilibrado */
+  font-size: 72px;
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -281,15 +288,21 @@ body {
 <script>
 (function () {
   const el = document.getElementById("cupom-text");
+
   if (el) {
     const container = el.parentElement;
     let fontSize = 72;
     const min = 20;
 
+    el.style.fontSize = fontSize + "px";
     el.style.whiteSpace = "nowrap";
 
     const getAvailableWidth = function () {
-      return container.clientWidth - 80; // padding lateral (40px de cada lado)
+      const styles = window.getComputedStyle(container);
+      const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+      const paddingRight = parseFloat(styles.paddingRight) || 0;
+
+      return container.clientWidth - paddingLeft - paddingRight;
     };
 
     while (el.scrollWidth > getAvailableWidth() && fontSize > min) {
@@ -299,8 +312,10 @@ body {
   }
 
   const segmento = document.getElementById("segmento-bloco");
+
   if (segmento) {
     const texto = segmento.textContent?.trim() || "";
+
     if (!texto || texto === "NEGÓCIO DE CLIENTES:" || texto.includes("{{SEGMENTO}}")) {
       segmento.style.display = "none";
     }

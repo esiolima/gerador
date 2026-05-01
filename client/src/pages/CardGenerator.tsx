@@ -446,8 +446,9 @@ export default function CardGenerator() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          html: body,
-          jobId: result.jobId || `journal_${Date.now()}`,
+          html: journalHtml,
+          jobId: result?.jobId,
+          fileName: result?.fileName, // Enviar o nome do arquivo original
         }),
       });
 
@@ -813,10 +814,10 @@ export default function CardGenerator() {
     display:flex;
     justify-content:center;
     align-items:flex-start;
-    background:#ffffff;
+    background:#f3f4f6; /* Cinza claro para o fundo do visualizador */
     padding:24px;
     border-radius:24px;
-    border:1px solid rgba(255,255,255,.10);
+    border:1px solid rgba(0,0,0,.10);
   }
 
   .journal-preview-scaler{
@@ -845,9 +846,9 @@ export default function CardGenerator() {
     display:flex;
     align-items:center;
     justify-content:center;
-    background:#ffffff;
-    color:#000000;
-    border-bottom:1px solid #e5e7eb;
+    background:#374151; /* Cinza escuro para a label da página */
+    color:#ffffff;
+    border-bottom:1px solid #1f2937;
     font-size:22px;
     font-weight:900;
     letter-spacing:.04em;

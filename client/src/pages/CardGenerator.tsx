@@ -444,7 +444,7 @@ export default function CardGenerator() {
     try {
       const serializedJournal = serializeJournalForPdf(journalRef.current);
 
-      const body = `<!doctype html>
+      const journalHtml = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />

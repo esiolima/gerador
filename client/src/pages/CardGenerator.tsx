@@ -308,6 +308,7 @@ export default function CardGenerator() {
   );
 
   const [isGeneratingJournal, setIsGeneratingJournal] = useState(false);
+  const [journalProgress, setJournalProgress] = useState({ step: 0, message: "" });
 
   const socketRef = useRef<Socket | null>(null);
   const journalRef = useRef<HTMLDivElement>(null);
@@ -440,9 +441,11 @@ export default function CardGenerator() {
     if (!journalRef.current || !result) return;
 
     setIsGeneratingJournal(true);
+    setJournalProgress({ step: 10, message: "Iniciando geração do jornal..." });
 
     try {
       const serializedJournal = serializeJournalForPdf(journalRef.current);
+      setJournalProgress({ step: 30, message: "Preparando conteúdo das páginas..." });
 
       const journalHtml = `<!doctype html>
 <html>
@@ -455,15 +458,19 @@ export default function CardGenerator() {
 </body>
 </html>`;
 
+      setJournalProgress({ step: 50, message: "Processando páginas e ajustando dimensões..." });
+
       const response = await fetch("/api/journal/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           html: journalHtml,
           jobId: result?.jobId,
-          fileName: result?.fileName, // Enviar o nome do arquivo original
+          fileName: result?.fileName,
         }),
       });
+
+      setJournalProgress({ step: 80, message: "Mesclando arquivos e finalizando PDF..." });
 
       const json = await response.json();
 
@@ -471,12 +478,16 @@ export default function CardGenerator() {
         throw new Error(json.error || "Erro ao gerar PDF do jornal.");
       }
 
-      window.location.href = json.pdfUrl;
+      setJournalProgress({ step: 100, message: "Concluído! Iniciando download..." });
+      
+      setTimeout(() => {
+        window.location.href = json.pdfUrl;
+        setIsGeneratingJournal(false);
+      }, 1000);
+
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao gerar PDF do jornal.";
-      setError(message);
-      window.alert(message);
-    } finally {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Erro ao gerar PDF do jornal.");
       setIsGeneratingJournal(false);
     }
   };
@@ -799,6 +810,34 @@ export default function CardGenerator() {
       </main>
 
       <style>{journalCss}</style>
+
+      {/* Popup de Progresso do Jornal */}
+      {isGeneratingJournal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <FileText className="h-8 w-8 animate-pulse" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Gerando Jornal PDF</h3>
+              <p className="mt-2 text-sm text-gray-500">Isso pode levar alguns segundos dependendo da quantidade de cards.</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-500 ease-out"
+                  style={{ width: `${journalProgress.step}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-blue-600">{journalProgress.message}</span>
+                <span className="text-gray-400">{journalProgress.step}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

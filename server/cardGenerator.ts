@@ -50,20 +50,28 @@ export class CardGenerator extends EventEmitter {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     }
 
+    const executablePath = 
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      process.env.CHROME_BIN ||
+      process.env.CHROMIUM_PATH ||
+      "/usr/bin/chromium";
+    
+    console.log(`[CardGenerator] Launching browser with: ${executablePath}`);
+
     this.browser = await puppeteer.launch({
-      executablePath:
-        process.env.PUPPETEER_EXECUTABLE_PATH ||
-        process.env.CHROME_BIN ||
-        process.env.CHROMIUM_PATH ||
-        "/usr/bin/chromium",
+      executablePath,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--font-render-hinting=none",
+        "--disable-gpu",
+        "--single-process",
       ],
       headless: true,
     });
+    
+    console.log("[CardGenerator] Browser launched successfully");
   }
 
   normalizeType(tipo: string): string {

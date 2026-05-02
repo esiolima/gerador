@@ -1,4 +1,6 @@
 FROM node:20-slim
+
+# Instala dependências do sistema para o Chromium
 RUN apt-get update && apt-get install -y \
     chromium \
     ca-certificates \
@@ -37,11 +39,27 @@ RUN apt-get update && apt-get install -y \
     git \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+
+# Copia arquivos de dependências
 COPY package*.json ./
+
+# Instala dependências (incluindo puppeteer-core que usará o Chromium do sistema)
 RUN npm install --legacy-peer-deps
+
+# Copia o restante do projeto
 COPY . .
+
+# Variáveis de ambiente para o Puppeteer
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Build do frontend e backend
 RUN npm run build
+
+# Expõe a porta
 EXPOSE 3000
+
+# Comando de inicialização
 CMD ["npm", "start"]

@@ -1,4 +1,3 @@
-import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
@@ -122,9 +121,8 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
 
 const plugins = [
   react(),
-  tailwindcss(),
-  vitePluginManusRuntime(),
-  // vitePluginManusDebugCollector(),  // Comentei o plugin de Vite Analytics
+  vitePluginManusRuntime()
+  // vitePluginManusDebugCollector(),
 ];
 
 export default defineConfig({
@@ -133,17 +131,17 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-    },
+      "@assets": path.resolve(import.meta.dirname, "attached_assets")
+    }
   },
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
-    emptyOutDir: true,
+    emptyOutDir: true
   },
   server: {
-    host: true,
-  },
+    host: true
+  }
 });

@@ -537,7 +537,7 @@ export class CardGenerator extends EventEmitter {
           percentage: Math.round((processed / total) * 100),
           currentCard: `${processed}/${total} cards processados`,
         });
-      }));
+      }
     }
 
     const baseName = originalFileName

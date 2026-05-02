@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Newspaper,
   FileDown,
+  FileText,
   RefreshCcw,
   Pencil,
   AlertCircle,

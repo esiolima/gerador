@@ -1,8 +1,6 @@
 /* client/src/index.css - FINAL PREMIUM */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -17,6 +15,9 @@
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -34,15 +35,12 @@
 :root {
   --radius: 0.7rem;
 
-  /* 🔵 NOVO AZUL PRINCIPAL (premium) */
   --primary: oklch(0.55 0.18 255);
   --primary-foreground: oklch(0.98 0 0);
 
-  /* 🔵 FUNDO */
   --background: oklch(0.99 0.002 250);
   --foreground: oklch(0.23 0.02 255);
 
-  /* 🔵 ELEMENTOS */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.23 0.02 255);
 
@@ -52,7 +50,6 @@
   --border: oklch(0.9 0.01 250);
   --input: oklch(0.92 0.01 250);
 
-  /* 🔵 FOCO (IMPORTANTE UX) */
   --ring: oklch(0.6 0.2 255);
 }
 
@@ -105,7 +102,6 @@
 /* ===================== COMPONENTS ===================== */
 
 @layer components {
-
   .container {
     width: 100%;
     margin-left: auto;
@@ -119,7 +115,6 @@
     min-width: 0;
   }
 
-  /* 🔵 BOTÕES PREMIUM */
   .btn-primary {
     background: linear-gradient(135deg, #2563eb, #0ea5e9);
     color: white;
@@ -132,14 +127,12 @@
     filter: brightness(1.05);
   }
 
-  /* 🔵 CARD GLASS */
   .glass {
-    background: rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
-  /* 🔵 SCROLL SUAVE */
   .smooth-scroll {
     scroll-behavior: smooth;
   }

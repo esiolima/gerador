@@ -469,44 +469,46 @@ export class CardGenerator extends EventEmitter {
         fs.writeFileSync(tmpHtmlPath, html, "utf8");
         fs.writeFileSync(htmlPath, html, "utf8");
 
-        const page = await this.browser!.newPage();
+        let page;
+        try {
+          // Reutiliza a primeira página aberta ou cria uma nova se necessário
+          const pages = await this.browser!.pages();
+          page = pages.length > 0 ? pages[0] : await this.browser!.newPage();
 
-        await page.setViewport({
-          width: 700,
-          height: 1058,
-          deviceScaleFactor: 2,
-        });
+          await page.setViewport({
+            width: 700,
+            height: 1058,
+            deviceScaleFactor: 1.5, // Reduzido levemente de 2 para 1.5 para economizar memória
+          });
 
-        await page.goto(`file://${tmpHtmlPath}`, {
-          waitUntil: "networkidle0",
-          timeout: 120000,
-        });
+          // Navega com retry simples para evitar o "detached"
+          await page.goto(`file://${tmpHtmlPath}`, {
+            waitUntil: "load", // Mudado de networkidle0 para load para ser mais rápido
+            timeout: 60000,
+          });
 
-        await this.waitForPageReady(page);
+          await this.waitForPageReady(page);
 
-        await page.pdf({
-          path: pdfPath,
-          width: "700px",
-          height: "1058px",
-          printBackground: true,
-          margin: {
-            top: "0px",
-            right: "0px",
-            bottom: "0px",
-            left: "0px",
-          },
-        });
+          await page.pdf({
+            path: pdfPath,
+            width: "700px",
+            height: "1058px",
+            printBackground: true,
+            margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+          });
 
-        await page.screenshot({
-          path: pngPath,
-          type: "png",
-          fullPage: false,
-        });
+          await page.screenshot({
+            path: pngPath,
+            type: "png",
+            fullPage: false,
+          });
+        } catch (pageErr) {
+          console.error(`[CardGenerator] Erro no card ${index + 1}:`, pageErr);
+          throw pageErr;
+        }
 
-        await page.close();
-
-        // Forçar coleta de lixo se possível ou apenas pequeno delay
-        await new Promise(r => setTimeout(r, 100));
+        // Não fechamos a página aqui para reusá-la no próximo card do loop
+        await new Promise(r => setTimeout(r, 200));
 
         processed++;
 

@@ -76,7 +76,7 @@ export function setupJournalRoute(app: express.Express) {
       const page = await browser.newPage();
       // Viewport largo para garantir renderização correta
       await page.setViewport({ width: 2400, height: 5000, deviceScaleFactor: 1 });
-      await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0", timeout: 120000 });
+      await page.goto(`file://${htmlPath}`, { waitUntil: "load", timeout: 60000 });
 
       // Ativar Shadow DOM e preparar layout para impressão
       await page.evaluate(() => {
@@ -115,6 +115,10 @@ export function setupJournalRoute(app: express.Express) {
       for (let i = 0; i < pages.length; i++) {
         const box = await pages[i].boundingBox();
         if (!box) continue;
+
+        // Otimização: Força o scroll para a página antes de capturar para garantir renderização de imagens/shadow dom
+        await pages[i].evaluate((el) => el.scrollIntoView());
+        await new Promise(r => setTimeout(r, 500)); // Pequena pausa para estabilizar
 
         const pagePdf = await page.pdf({
           printBackground: true,

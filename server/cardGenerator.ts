@@ -408,11 +408,11 @@ export class CardGenerator extends EventEmitter {
     let processed = 0;
     const cards: GeneratedCard[] = [];
 
-    const BATCH_SIZE = 3; // Processar 3 cards por vez para economizar memória
+    const BATCH_SIZE = 1; // Processar 1 por vez para estabilidade máxima em servidores pequenos
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
       
-      await Promise.all(batch.map(async (row, batchIndex) => {
+      for (const [batchIndex, row] of batch.entries()) {
         const index = i + batchIndex;
         const tipo = this.normalizeType(row.tipo);
         const templatePath = path.join(TEMPLATES_DIR, `${tipo}.html`);
@@ -504,6 +504,9 @@ export class CardGenerator extends EventEmitter {
         });
 
         await page.close();
+
+        // Forçar coleta de lixo se possível ou apenas pequeno delay
+        await new Promise(r => setTimeout(r, 100));
 
         processed++;
 

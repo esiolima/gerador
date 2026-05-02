@@ -6,11 +6,11 @@ import fetch from "node-fetch";
 
 const LOGOS_DIR = path.resolve("logos");
 
-// O Token deve ser configurado como variável de ambiente no Railway (GITHUB_TOKEN)
+// Configurações do GitHub via variáveis de ambiente
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const REPO_OWNER = "esiolima";
-const REPO_NAME = "cards_trade_v2";
-const BRANCH = "fix-logos";
+const REPO_OWNER = process.env.GITHUB_REPO_OWNER || "esiolima";
+const REPO_NAME = process.env.GITHUB_REPO_NAME || "gerador";
+const BRANCH = process.env.GITHUB_BRANCH || "main";
 
 // Ensure logos directory exists
 if (!fs.existsSync(LOGOS_DIR)) {
@@ -22,7 +22,7 @@ if (!fs.existsSync(LOGOS_DIR)) {
  */
 async function syncWithGithub(action: string, fileName: string, fileContent?: Buffer) {
   if (!GITHUB_TOKEN) {
-    console.warn(`[GITHUB API SYNC] Sincronização ignorada: GITHUB_TOKEN não configurado.`);
+    // Silenciosamente ignora se não estiver configurado, para não poluir logs de produção padrão
     return;
   }
 
@@ -45,11 +45,10 @@ async function syncWithGithub(action: string, fileName: string, fileContent?: Bu
         sha = data.sha;
       }
     } catch (e) {
-      // Arquivo pode não existir, o que é normal para novos uploads
+      // Arquivo pode não existir
     }
 
     if (action === "upload" && fileContent) {
-      // 2. Criar ou Atualizar arquivo no GitHub
       const body = JSON.stringify({
         message: `Plataforma: ${sha ? 'Atualizado' : 'Adicionado'} logo ${fileName}`,
         content: fileContent.toString("base64"),
@@ -70,7 +69,6 @@ async function syncWithGithub(action: string, fileName: string, fileContent?: Bu
         console.error(`[GITHUB API SYNC] Erro no upload:`, errorData);
       }
     } else if (action === "delete" && sha) {
-      // 3. Deletar arquivo no GitHub
       const body = JSON.stringify({
         message: `Plataforma: Removido logo ${fileName}`,
         sha: sha,
@@ -96,7 +94,7 @@ async function syncWithGithub(action: string, fileName: string, fileContent?: Bu
 }
 
 // Configure multer for logo uploads
-const storage = multer.memoryStorage(); // Usar memoryStorage para facilitar o envio para API
+const storage = multer.memoryStorage();
 
 const fileFilter = (
   req: express.Request,
@@ -126,7 +124,6 @@ const upload = multer({
 });
 
 export function setupLogoUploadRoute(app: express.Express) {
-  // Rota de Upload com suporte a substituição e sincronização via API GitHub
   app.post("/api/logo/upload", (req, res, next) => {
     const fileName = req.headers['x-file-name'] as string;
     const overwrite = req.headers['x-overwrite'] === 'true';
@@ -147,10 +144,7 @@ export function setupLogoUploadRoute(app: express.Express) {
     const filePath = path.join(LOGOS_DIR, fileName);
 
     try {
-      // 1. Salvar localmente no servidor (Railway)
       fs.writeFileSync(filePath, req.file.buffer);
-
-      // 2. Sincronizar com GitHub via API (em background)
       syncWithGithub('upload', fileName, req.file.buffer);
 
       res.json({
@@ -164,7 +158,6 @@ export function setupLogoUploadRoute(app: express.Express) {
     }
   });
 
-  // Rota de Deleção de Logo com sincronização via API GitHub
   app.delete("/api/logos/:name", async (req, res) => {
     const logoName = req.params.name;
     const filePath = path.join(LOGOS_DIR, logoName);
@@ -174,12 +167,8 @@ export function setupLogoUploadRoute(app: express.Express) {
     }
 
     try {
-      // 1. Remover localmente
       fs.unlinkSync(filePath);
-      
-      // 2. Sincronizar com GitHub via API (em background)
       syncWithGithub('delete', logoName);
-      
       res.json({ success: true, message: `Logo "${logoName}" excluída com sucesso` });
     } catch (err) {
       res.status(500).json({ error: "Erro ao excluir o arquivo" });

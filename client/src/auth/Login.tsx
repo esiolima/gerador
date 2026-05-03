@@ -10,11 +10,19 @@ export default function Login() {
   const [showRequest, setShowRequest] = useState(false);
   const [form, setForm] = useState<any>({});
 
+  const fields = [
+    { key: "name", label: "nome" },
+    { key: "email", label: "e-mail" },
+    { key: "company", label: "empresa" },
+    { key: "role", label: "cargo" },
+    { key: "phone", label: "telefone" },
+  ];
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#06111f] text-white">
       {/* LOGIN */}
       <div className="p-6 bg-black/40 rounded-xl w-full max-w-md">
-        <h1 className="text-xl font-bold mb-4">Login</h1>
+        <h1 className="text-xl font-bold mb-4">Conecte-se</h1>
 
         <input
           placeholder="Email"
@@ -61,13 +69,13 @@ export default function Login() {
 
             <h2 className="text-lg font-semibold">Solicitar acesso</h2>
 
-            {["nome", "e-mail", "empresa", "cargo", "telefone"].map((f) => (
+            {fields.map((f) => (
               <input
-                key={f}
-                placeholder={f}
+                key={f.key}
+                placeholder={f.label}
                 className="w-full p-2 bg-black/30 rounded"
                 onChange={(e) =>
-                  setForm({ ...form, [f]: e.target.value })
+                  setForm({ ...form, [f.key]: e.target.value })
                 }
               />
             ))}

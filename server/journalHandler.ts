@@ -7,8 +7,6 @@ import { PDFDocument } from "pdf-lib";
 const OUTPUT_DIR = path.resolve("output");
 const JOURNAL_WIDTH = 1080;
 const FIXED_PAGE_HEIGHT = 1920;
-const MIN_CATEGORY_HEIGHT = 1920;
-const MAX_CATEGORY_HEIGHT = 30000;
 
 type JournalPagePayload = {
   type: "cover" | "category" | "ad" | string;
@@ -80,11 +78,14 @@ async function launchBrowser(): Promise<Browser> {
   });
 }
 
-function buildPageHtml(pageHtml: string) {
+function buildPageHtml(pageHtml: string, baseUrl: string) {
+  const safeBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+
   return `<!doctype html>
 <html lang="pt-br">
 <head>
   <meta charset="utf-8" />
+  <base href="${safeBaseUrl}" />
   <style>
     @font-face {
       font-family: 'Inter';
@@ -106,9 +107,12 @@ function buildPageHtml(pageHtml: string) {
       width: ${JOURNAL_WIDTH}px !important;
       min-width: ${JOURNAL_WIDTH}px !important;
       max-width: ${JOURNAL_WIDTH}px !important;
+      height: ${FIXED_PAGE_HEIGHT}px !important;
+      min-height: ${FIXED_PAGE_HEIGHT}px !important;
+      max-height: ${FIXED_PAGE_HEIGHT}px !important;
       margin: 0 !important;
       padding: 0 !important;
-      overflow: visible !important;
+      overflow: hidden !important;
       background: #ffffff !important;
       font-family: Inter, Arial, sans-serif;
       color: #111111;
@@ -122,44 +126,30 @@ function buildPageHtml(pageHtml: string) {
       print-color-adjust: exact !important;
     }
 
+    img {
+      max-width: none;
+    }
+
     .journal-page-label {
       display: none !important;
     }
 
-    .journal-pdf-page,
-    [data-journal-page] {
-      width: ${JOURNAL_WIDTH}px !important;
-      max-width: ${JOURNAL_WIDTH}px !important;
-      margin: 0 !important;
-      box-shadow: none !important;
-      overflow: hidden !important;
-      break-after: auto !important;
-      page-break-after: auto !important;
-    }
-
     .journal-page,
     .journal-cover-page,
-    .journal-ad-page {
+    .journal-ad-page,
+    .journal-category-page,
+    [data-journal-page] {
       width: ${JOURNAL_WIDTH}px !important;
+      min-width: ${JOURNAL_WIDTH}px !important;
+      max-width: ${JOURNAL_WIDTH}px !important;
       height: ${FIXED_PAGE_HEIGHT}px !important;
       min-height: ${FIXED_PAGE_HEIGHT}px !important;
       max-height: ${FIXED_PAGE_HEIGHT}px !important;
       margin: 0 !important;
       overflow: hidden !important;
       box-shadow: none !important;
-      page-break-after: auto !important;
       break-after: auto !important;
-    }
-
-    .journal-category-page {
-      width: ${JOURNAL_WIDTH}px !important;
-      min-height: ${MIN_CATEGORY_HEIGHT}px !important;
-      height: auto !important;
-      margin: 0 !important;
-      overflow: visible !important;
-      box-shadow: none !important;
       page-break-after: auto !important;
-      break-after: auto !important;
     }
 
     .journal-card-wrap {
@@ -210,41 +200,13 @@ async function waitForPageReady(page: Page) {
   });
 }
 
-async function getRenderedHeight(page: Page, pageType: string) {
-  const measuredHeight = await page.evaluate(() => {
-    const pageElement = document.querySelector("[data-journal-page]") as HTMLElement | null;
-    const body = document.body;
-    const html = document.documentElement;
 
-    const pageHeight = pageElement
-      ? Math.ceil(Math.max(pageElement.scrollHeight, pageElement.offsetHeight, pageElement.getBoundingClientRect().height))
-      : 0;
-
-    return Math.ceil(
-      Math.max(
-        pageHeight,
-        body.scrollHeight,
-        body.offsetHeight,
-        html.scrollHeight,
-        html.offsetHeight
-      )
-    );
-  });
-
-  if (pageType === "cover" || pageType === "ad") {
-    return FIXED_PAGE_HEIGHT;
-  }
-
-  return Math.min(
-    Math.max(measuredHeight || MIN_CATEGORY_HEIGHT, MIN_CATEGORY_HEIGHT),
-    MAX_CATEGORY_HEIGHT
-  );
-}
 
 async function renderSinglePagePdf(
   browser: Browser,
   journalPage: JournalPagePayload,
-  outputPath: string
+  outputPath: string,
+  baseUrl: string
 ) {
   const page = await browser.newPage();
 
@@ -266,25 +228,17 @@ async function renderSinglePagePdf(
       deviceScaleFactor: 1,
     });
 
-    await page.setContent(buildPageHtml(journalPage.html), {
-      waitUntil: "load",
+    await page.setContent(buildPageHtml(journalPage.html, baseUrl), {
+      waitUntil: "networkidle0",
       timeout: 90000,
     });
 
     await waitForPageReady(page);
 
-    const finalHeight = await getRenderedHeight(page, journalPage.type);
-
-    await page.setViewport({
-      width: JOURNAL_WIDTH,
-      height: finalHeight,
-      deviceScaleFactor: 1,
-    });
-
     await page.pdf({
       path: outputPath,
       width: `${JOURNAL_WIDTH}px`,
-      height: `${finalHeight}px`,
+      height: `${FIXED_PAGE_HEIGHT}px`,
       printBackground: true,
       preferCSSPageSize: false,
       margin: {
@@ -364,6 +318,10 @@ export function setupJournalRoute(app: Express) {
 
       browser = await launchBrowser();
 
+      const protocol = req.protocol || "http";
+      const host = req.get("host") || `localhost:${process.env.PORT || "3000"}`;
+      const baseUrl = `${protocol}://${host}`;
+
       const tempPdfPaths: string[] = [];
 
       for (const [index, journalPage] of normalizedPages.entries()) {
@@ -378,7 +336,7 @@ export function setupJournalRoute(app: Express) {
           `[JournalHandler] Renderizando página ${index + 1}/${normalizedPages.length}: ${journalPage.type} ${journalPage.title || ""}`
         );
 
-        await renderSinglePagePdf(browser, journalPage, tempPdfPath);
+        await renderSinglePagePdf(browser, journalPage, tempPdfPath, baseUrl);
         tempPdfPaths.push(tempPdfPath);
       }
 

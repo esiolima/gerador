@@ -422,7 +422,7 @@ export default function CardGenerator() {
     }
   });
 
-  const [journalZoom, setJournalZoom] = useState<number>(30);
+  const [journalZoom, setJournalZoom] = useState<number>(50);
 
   const [footerText, setFooterText] = useState(
     "Ofertas válidas enquanto durarem os estoques. Consulte condições, disponibilidade e regulamento nos canais oficiais."
@@ -509,7 +509,7 @@ export default function CardGenerator() {
   };
 
   const updateJournalZoom = (nextZoom: number) => {
-    const safeZoom = Math.min(100, Math.max(15, Math.round(nextZoom || 30)));
+    const safeZoom = Math.min(100, Math.max(15, Math.round(nextZoom || 50)));
     setJournalZoom(safeZoom);
   };
 
@@ -1012,49 +1012,44 @@ export default function CardGenerator() {
 
         {showJournal && result && (
           <section className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
-              <div>
-                <h2 className="text-2xl font-black">Editor visual do jornal</h2>
-                <p className="text-sm text-white/45">
-                  Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as
-                  imagens. Cada categoria será gerada como uma página independente.
+            <div className="journal-preview-viewport">
+              <div className="journal-editor-controls" aria-label="Controles do jornal diagramado">
+                <p className="journal-editor-help">
+                  Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as imagens. Cada categoria será gerada como uma página independente.
                 </p>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex max-w-3xl flex-wrap items-center gap-2">
+                <div className="journal-editor-category-list">
                   {groupedCards.map(([category]) => (
                     <div
                       key={category}
-                      className="flex min-h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/15"
+                      className="journal-editor-category-control"
                       title={`Configurações da categoria ${category}`}
                     >
-                      <Palette className="h-4 w-4 shrink-0" />
-                      <span className="max-w-[150px] truncate">{category}</span>
+                      <div className="journal-editor-category-name">{category}</div>
 
-                      <label className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wide text-white/55">
-                        Fundo
-                        <input
-                          type="color"
-                          value={getCategoryBackground(category)}
-                          onChange={(event) =>
-                            updateCategoryBackground(category, event.target.value)
-                          }
-                          className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                        />
-                      </label>
+                      <div className="journal-editor-color-row">
+                        <label className="journal-editor-color-control">
+                          <span>Fundo</span>
+                          <input
+                            type="color"
+                            value={getCategoryBackground(category)}
+                            onChange={(event) =>
+                              updateCategoryBackground(category, event.target.value)
+                            }
+                          />
+                        </label>
 
-                      <label className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wide text-white/55">
-                        Tarja
-                        <input
-                          type="color"
-                          value={getCategoryBarColor(category)}
-                          onChange={(event) =>
-                            updateCategoryBarColor(category, event.target.value)
-                          }
-                          className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                        />
-                      </label>
+                        <label className="journal-editor-color-control">
+                          <span>Tarja</span>
+                          <input
+                            type="color"
+                            value={getCategoryBarColor(category)}
+                            onChange={(event) =>
+                              updateCategoryBarColor(category, event.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1062,15 +1057,13 @@ export default function CardGenerator() {
                 <Button
                   disabled={isGeneratingJournal}
                   onClick={generateJournalPdf}
-                  className="h-12 rounded-xl bg-white text-black hover:bg-white/90"
+                  className="h-12 w-full rounded-xl bg-slate-950 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   <FileDown className="mr-2 h-5 w-5" />
                   {isGeneratingJournal ? "Gerando PDF..." : "Gerar em PDF"}
                 </Button>
               </div>
-            </div>
 
-            <div className="journal-preview-viewport">
               <div
                 className="journal-preview-scaler"
                 style={{
@@ -1159,7 +1152,7 @@ export default function CardGenerator() {
                                   {categoryBarLeftImage ? (
                                     <img src={categoryBarLeftImage} alt="Imagem esquerda da tarja" />
                                   ) : (
-                                    <span>+</span>
+                                    <span className="journal-category-bar-image-placeholder" />
                                   )}
                                 </button>
 
@@ -1179,7 +1172,7 @@ export default function CardGenerator() {
                                   {categoryBarRightImage ? (
                                     <img src={categoryBarRightImage} alt="Imagem direita da tarja" />
                                   ) : (
-                                    <span>+</span>
+                                    <span className="journal-category-bar-image-placeholder" />
                                   )}
                                 </button>
                               </div>
@@ -1463,22 +1456,109 @@ const journalCss = `
     transition:transform .22s ease, width .22s ease;
   }
 
+  .journal-editor-controls,
   .journal-zoom-controls{
     position:sticky;
     top:18px;
     z-index:30;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:8px;
-    margin-left:18px;
     align-self:flex-start;
-    padding:10px;
     border:1px solid rgba(0,0,0,.10);
     border-radius:18px;
     background:rgba(255,255,255,.92);
     box-shadow:0 18px 40px rgba(15,23,42,.16);
     backdrop-filter:blur(12px);
+  }
+
+  .journal-editor-controls{
+    width:280px;
+    max-height:calc(82vh - 48px);
+    overflow:auto;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin-right:18px;
+    padding:14px;
+    color:#0f172a;
+  }
+
+  .journal-editor-help{
+    margin:0;
+    padding:0 2px 12px 2px;
+    border-bottom:1px solid rgba(15,23,42,.10);
+    font-size:12px;
+    line-height:1.45;
+    font-weight:700;
+    color:#334155;
+  }
+
+  .journal-editor-category-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .journal-editor-category-control{
+    display:flex;
+    flex-direction:column;
+    gap:9px;
+    padding:10px;
+    border:1px solid rgba(15,23,42,.08);
+    border-radius:14px;
+    background:#f8fafc;
+  }
+
+  .journal-editor-category-name{
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:12px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.02em;
+    color:#0f172a;
+  }
+
+  .journal-editor-color-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+
+  .journal-editor-color-control{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    min-width:0;
+    height:34px;
+    padding:0 8px;
+    border-radius:10px;
+    background:#e2e8f0;
+    color:#0f172a;
+    font-size:10px;
+    font-weight:900;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+
+  .journal-editor-color-control input{
+    width:28px;
+    height:24px;
+    border:0;
+    border-radius:8px;
+    background:transparent;
+    padding:0;
+    cursor:pointer;
+  }
+
+  .journal-zoom-controls{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    margin-left:18px;
+    padding:10px;
   }
 
   .journal-zoom-button{
@@ -1670,9 +1750,9 @@ const journalCss = `
   .journal-category-bar-image-slot{
     width:100px;
     height:100px;
-    border:1px dashed rgba(255,255,255,.55);
-    border-radius:999px;
-    background:rgba(255,255,255,.12);
+    border:0;
+    border-radius:0;
+    background:transparent;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -1682,7 +1762,7 @@ const journalCss = `
   }
 
   .journal-category-bar-image-slot:hover{
-    background:rgba(255,255,255,.22);
+    background:transparent;
   }
 
   .journal-category-bar-image-slot img{
@@ -1692,11 +1772,10 @@ const journalCss = `
     display:block;
   }
 
-  .journal-category-bar-image-slot span{
-    color:rgba(255,255,255,.82);
-    font-size:36px;
-    font-weight:900;
-    line-height:1;
+  .journal-category-bar-image-placeholder{
+    display:block;
+    width:100%;
+    height:100%;
   }
 
   .journal-grid{

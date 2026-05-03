@@ -55,6 +55,8 @@ type JournalCardPage = {
   isContinuation: boolean;
 };
 
+type CategoryBarImages = Record<string, { left?: string; right?: string }>;
+
 const FIRST_CATEGORY_PAGE_CARD_LIMIT = 6;
 const CONTINUATION_CATEGORY_PAGE_CARD_LIMIT = 9;
 
@@ -359,7 +361,10 @@ function buildJournalPagesForPdf(journalElement: HTMLDivElement): JournalPagePay
 
 const PAGE_BACKGROUND_STORAGE_KEY = "jornal_page_background";
 const CATEGORY_BACKGROUNDS_STORAGE_KEY = "jornal_category_backgrounds";
+const CATEGORY_BAR_COLORS_STORAGE_KEY = "jornal_category_bar_colors";
+const CATEGORY_BAR_IMAGES_STORAGE_KEY = "jornal_category_bar_images";
 const DEFAULT_JOURNAL_BACKGROUND = "#ffffff";
+const DEFAULT_CATEGORY_BAR_COLOR = "#0f6bc8";
 
 export default function CardGenerator() {
   const [file, setFile] = useState<File | null>(null);
@@ -394,6 +399,29 @@ export default function CardGenerator() {
       return { __default: previousGlobalBackground };
     }
   });
+
+  const [categoryBarColors, setCategoryBarColors] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+
+    try {
+      const saved = window.localStorage.getItem(CATEGORY_BAR_COLORS_STORAGE_KEY);
+      return saved ? (JSON.parse(saved) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [categoryBarImages, setCategoryBarImages] = useState<CategoryBarImages>(() => {
+    if (typeof window === "undefined") return {};
+
+    try {
+      const saved = window.localStorage.getItem(CATEGORY_BAR_IMAGES_STORAGE_KEY);
+      return saved ? (JSON.parse(saved) as CategoryBarImages) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [journalZoom, setJournalZoom] = useState<number>(30);
 
   const [footerText, setFooterText] = useState(
@@ -429,6 +457,55 @@ export default function CardGenerator() {
       ...current,
       [category]: color,
     }));
+  };
+
+  const getCategoryBarColor = (category: string) =>
+    categoryBarColors[category] || DEFAULT_CATEGORY_BAR_COLOR;
+
+  const updateCategoryBarColor = (category: string, color: string) => {
+    setCategoryBarColors((current) => ({
+      ...current,
+      [category]: color,
+    }));
+  };
+
+  const getCategoryBarImage = (category: string, side: "left" | "right") =>
+    categoryBarImages[category]?.[side] || "";
+
+  const updateCategoryBarImage = async (
+    category: string,
+    side: "left" | "right",
+    selectedFile?: File | null
+  ) => {
+    if (!selectedFile) return;
+
+    if (!selectedFile.type.startsWith("image/")) {
+      window.alert("Envie apenas arquivos de imagem.");
+      return;
+    }
+
+    const dataUrl = await readImageAsDataUrl(selectedFile);
+
+    setCategoryBarImages((current) => ({
+      ...current,
+      [category]: {
+        ...(current[category] || {}),
+        [side]: dataUrl,
+      },
+    }));
+  };
+
+  const chooseCategoryBarImage = (category: string, side: "left" | "right") => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      updateCategoryBarImage(category, side, target?.files?.[0]);
+    };
+
+    input.click();
   };
 
   const updateJournalZoom = (nextZoom: number) => {
@@ -492,6 +569,20 @@ export default function CardGenerator() {
       JSON.stringify(categoryBackgrounds)
     );
   }, [categoryBackgrounds]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      CATEGORY_BAR_COLORS_STORAGE_KEY,
+      JSON.stringify(categoryBarColors)
+    );
+  }, [categoryBarColors]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      CATEGORY_BAR_IMAGES_STORAGE_KEY,
+      JSON.stringify(categoryBarImages)
+    );
+  }, [categoryBarImages]);
 
   const handleFileSelect = (selectedFile: File | null | undefined) => {
     if (!selectedFile) return;
@@ -933,22 +1024,38 @@ export default function CardGenerator() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex max-w-3xl flex-wrap items-center gap-2">
                   {groupedCards.map(([category]) => (
-                    <label
+                    <div
                       key={category}
-                      className="flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/15"
-                      title={`Fundo da categoria ${category}`}
+                      className="flex min-h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/15"
+                      title={`Configurações da categoria ${category}`}
                     >
                       <Palette className="h-4 w-4 shrink-0" />
                       <span className="max-w-[150px] truncate">{category}</span>
-                      <input
-                        type="color"
-                        value={getCategoryBackground(category)}
-                        onChange={(event) =>
-                          updateCategoryBackground(category, event.target.value)
-                        }
-                        className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                      />
-                    </label>
+
+                      <label className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wide text-white/55">
+                        Fundo
+                        <input
+                          type="color"
+                          value={getCategoryBackground(category)}
+                          onChange={(event) =>
+                            updateCategoryBackground(category, event.target.value)
+                          }
+                          className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                        />
+                      </label>
+
+                      <label className="flex cursor-pointer items-center gap-1 text-[10px] uppercase tracking-wide text-white/55">
+                        Tarja
+                        <input
+                          type="color"
+                          value={getCategoryBarColor(category)}
+                          onChange={(event) =>
+                            updateCategoryBarColor(category, event.target.value)
+                          }
+                          className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                        />
+                      </label>
+                    </div>
                   ))}
                 </div>
 
@@ -992,6 +1099,10 @@ export default function CardGenerator() {
                     const isLastPageOfCategory =
                       !nextPage || nextPage.category !== journalPage.category;
                     const categoryBackground = getCategoryBackground(journalPage.category);
+                    const categoryBarColor = getCategoryBarColor(journalPage.category);
+                    const categoryBarTextColor = getReadableTextColor(categoryBarColor);
+                    const categoryBarLeftImage = getCategoryBarImage(journalPage.category, "left");
+                    const categoryBarRightImage = getCategoryBarImage(journalPage.category, "right");
                     const footerTextColor = getReadableTextColor(categoryBackground);
                     const footerBorderColor =
                       footerTextColor === "#ffffff"
@@ -1029,8 +1140,48 @@ export default function CardGenerator() {
                                 <span>Cabeçalho</span>
                               </div>
 
-                              <div className="journal-category-bar">
-                                {journalPage.category}
+                              <div
+                                className="journal-category-bar"
+                                style={{
+                                  background: categoryBarColor,
+                                  color: categoryBarTextColor,
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  className="journal-category-bar-image-slot"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    chooseCategoryBarImage(journalPage.category, "left");
+                                  }}
+                                  title={`Imagem esquerda da tarja ${journalPage.category}`}
+                                >
+                                  {categoryBarLeftImage ? (
+                                    <img src={categoryBarLeftImage} alt="Imagem esquerda da tarja" />
+                                  ) : (
+                                    <span>+</span>
+                                  )}
+                                </button>
+
+                                <span className="journal-category-bar-title">
+                                  {journalPage.category}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  className="journal-category-bar-image-slot"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    chooseCategoryBarImage(journalPage.category, "right");
+                                  }}
+                                  title={`Imagem direita da tarja ${journalPage.category}`}
+                                >
+                                  {categoryBarRightImage ? (
+                                    <img src={categoryBarRightImage} alt="Imagem direita da tarja" />
+                                  ) : (
+                                    <span>+</span>
+                                  )}
+                                </button>
                               </div>
                             </>
                           )}
@@ -1488,21 +1639,64 @@ const journalCss = `
 
   .journal-category-bar{
     width:calc(100% - 72px);
+    min-height:116px;
     margin:38px auto 24px auto;
     background:#0f6bc8;
     color:white;
-    display:flex;
+    display:grid;
+    grid-template-columns:100px minmax(0, 1fr) 100px;
     align-items:center;
     justify-content:center;
+    gap:18px;
     text-transform:uppercase;
     text-align:center;
     font-size:30px;
     line-height:1;
     font-weight:900;
     letter-spacing:.04em;
-    padding:18px 36px;
+    padding:8px 28px;
     border-radius:999px;
     box-sizing:border-box;
+  }
+
+  .journal-category-bar-title{
+    display:flex;
+    min-width:0;
+    align-items:center;
+    justify-content:center;
+    overflow-wrap:anywhere;
+  }
+
+  .journal-category-bar-image-slot{
+    width:100px;
+    height:100px;
+    border:1px dashed rgba(255,255,255,.55);
+    border-radius:999px;
+    background:rgba(255,255,255,.12);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    cursor:pointer;
+    padding:0;
+  }
+
+  .journal-category-bar-image-slot:hover{
+    background:rgba(255,255,255,.22);
+  }
+
+  .journal-category-bar-image-slot img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+  }
+
+  .journal-category-bar-image-slot span{
+    color:rgba(255,255,255,.82);
+    font-size:36px;
+    font-weight:900;
+    line-height:1;
   }
 
   .journal-grid{

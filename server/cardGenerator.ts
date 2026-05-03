@@ -42,6 +42,22 @@ export type GenerateCardsResult = {
 
 const VALID_TYPES = ["promocao", "cupom", "cashback", "queda", "bc"];
 
+type ProgressStage =
+  | "iniciando"
+  | "lendo_planilha"
+  | "validando_planilha"
+  | "preparando_card"
+  | "carregando_template"
+  | "processando_imagens"
+  | "renderizando_html"
+  | "aguardando_recursos"
+  | "gerando_pdf"
+  | "gerando_png"
+  | "card_finalizado"
+  | "compactando_zip"
+  | "finalizado"
+  | "erro";
+
 export class CardGenerator extends EventEmitter {
   private browser: Browser | null = null;
 
@@ -411,6 +427,36 @@ export class CardGenerator extends EventEmitter {
     }
   }
 
+
+  private emitProgress(data: {
+    processed: number;
+    total: number;
+    currentCard: string;
+    stage: ProgressStage;
+    percentage?: number;
+    detail?: string;
+    currentIndex?: number;
+  }) {
+    const safeTotal = data.total || 0;
+    const percentage =
+      typeof data.percentage === "number"
+        ? data.percentage
+        : safeTotal > 0
+          ? Math.round((data.processed / safeTotal) * 100)
+          : 0;
+
+    this.emit("progress", {
+      processed: data.processed,
+      total: data.total,
+      percentage,
+      currentCard: data.currentCard,
+      stage: data.stage,
+      detail: data.detail || "",
+      currentIndex: data.currentIndex,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   async generateCards(
     excelFilePath: string,
     originalFileName?: string
@@ -419,10 +465,28 @@ export class CardGenerator extends EventEmitter {
 
     if (!this.browser) throw new Error("Browser not initialized");
 
+    this.emitProgress({
+      processed: 0,
+      total: 0,
+      percentage: 0,
+      currentCard: "Iniciando geração dos cards...",
+      stage: "iniciando",
+      detail: "Preparando pastas e ambiente de geração.",
+    });
+
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const jobDir = path.join(OUTPUT_DIR, jobId);
 
     fs.mkdirSync(jobDir, { recursive: true });
+
+    this.emitProgress({
+      processed: 0,
+      total: 0,
+      percentage: 2,
+      currentCard: "Lendo planilha...",
+      stage: "lendo_planilha",
+      detail: "Abrindo o arquivo Excel enviado.",
+    });
 
     const workbook = xlsx.readFile(excelFilePath);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -430,6 +494,15 @@ export class CardGenerator extends EventEmitter {
     const rows: any[] = xlsx.utils.sheet_to_json(sheet, {
       defval: "",
       raw: false,
+    });
+
+    this.emitProgress({
+      processed: 0,
+      total: rows.length,
+      percentage: 4,
+      currentCard: "Validando dados da planilha...",
+      stage: "validando_planilha",
+      detail: "Conferindo colunas obrigatórias, tipos e valores.",
     });
 
     this.validateRows(rows);
@@ -452,9 +525,27 @@ export class CardGenerator extends EventEmitter {
         const tipo = this.normalizeType(row.tipo);
         const templatePath = path.join(TEMPLATES_DIR, `${tipo}.html`);
 
+        this.emitProgress({
+          processed,
+          total,
+          currentIndex: index + 1,
+          currentCard: `Card ${index + 1}/${total} - preparando dados`,
+          stage: "preparando_card",
+          detail: `Tipo: ${tipo || "não identificado"}`,
+        });
+
         if (!fs.existsSync(templatePath)) {
           throw new Error(`Template não encontrado: templates/${tipo}.html`);
         }
+
+        this.emitProgress({
+          processed,
+          total,
+          currentIndex: index + 1,
+          currentCard: `Card ${index + 1}/${total} - processando imagens`,
+          stage: "processando_imagens",
+          detail: "Localizando logo e selo.",
+        });
 
         const logoFile = this.findLogoFile(row.logo);
         const logoBase64 = logoFile
@@ -475,6 +566,15 @@ export class CardGenerator extends EventEmitter {
               )
             )
           : "";
+
+        this.emitProgress({
+          processed,
+          total,
+          currentIndex: index + 1,
+          currentCard: `Card ${index + 1}/${total} - carregando template`,
+          stage: "carregando_template",
+          detail: `Arquivo: templates/${tipo}.html`,
+        });
 
         let html = fs.readFileSync(templatePath, "utf8");
 
@@ -511,6 +611,15 @@ export class CardGenerator extends EventEmitter {
         try {
           console.log(`[CardGenerator] Gerando card ${index + 1}/${total} - tipo: ${tipo}`);
 
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: `Card ${index + 1}/${total} - abrindo renderizador`,
+            stage: "renderizando_html",
+            detail: "Criando página isolada no Chromium.",
+          });
+
           page = await this.browser.newPage();
 
           page.on("console", (msg) => {
@@ -530,12 +639,39 @@ export class CardGenerator extends EventEmitter {
             deviceScaleFactor: 1,
           });
 
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: `Card ${index + 1}/${total} - renderizando HTML`,
+            stage: "renderizando_html",
+            detail: "Aplicando o HTML final do card no Chromium.",
+          });
+
           await page.setContent(html, {
             waitUntil: "load",
             timeout: 60000,
           });
 
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: `Card ${index + 1}/${total} - aguardando fontes e imagens`,
+            stage: "aguardando_recursos",
+            detail: "Aguardando carregamento de fontes, logos, selos e ajustes de texto.",
+          });
+
           await this.waitForPageReady(page);
+
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: `Card ${index + 1}/${total} - gerando PDF`,
+            stage: "gerando_pdf",
+            detail: "Exportando o card em PDF.",
+          });
 
           await page.pdf({
             path: pdfPath,
@@ -550,14 +686,37 @@ export class CardGenerator extends EventEmitter {
             },
           });
 
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: `Card ${index + 1}/${total} - gerando imagem`,
+            stage: "gerando_png",
+            detail: "Exportando a prévia PNG do card.",
+          });
+
           await page.screenshot({
             path: pngPath,
             type: "png",
             fullPage: false,
           });
         } catch (pageErr) {
-          console.error(`[CardGenerator] Erro no card ${index + 1}:`, pageErr);
-          throw pageErr;
+          const errorMessage =
+            pageErr instanceof Error ? pageErr.message : String(pageErr || "erro desconhecido");
+          const friendlyMessage = `Erro no card ${index + 1}/${total} (${tipo}). Última etapa: geração/renderização do card.`;
+
+          console.error(`[CardGenerator] ${friendlyMessage}`, pageErr);
+
+          this.emitProgress({
+            processed,
+            total,
+            currentIndex: index + 1,
+            currentCard: friendlyMessage,
+            stage: "erro",
+            detail: errorMessage,
+          });
+
+          throw new Error(`${friendlyMessage} Detalhe técnico: ${errorMessage}`);
         } finally {
           if (page) {
             try {
@@ -593,11 +752,13 @@ export class CardGenerator extends EventEmitter {
 
         cards.push(card);
 
-        this.emit("progress", {
+        this.emitProgress({
           processed,
           total,
-          percentage: Math.round((processed / total) * 100),
-          currentCard: `${processed}/${total} cards processados`,
+          currentIndex: index + 1,
+          currentCard: `Card ${processed}/${total} finalizado`,
+          stage: "card_finalizado",
+          detail: "PDF e imagem gerados com sucesso.",
         });
       }
     }
@@ -605,6 +766,15 @@ export class CardGenerator extends EventEmitter {
     const baseName = originalFileName
       ? path.parse(originalFileName).name
       : path.parse(excelFilePath).name;
+
+    this.emitProgress({
+      processed,
+      total,
+      percentage: 96,
+      currentCard: "Compactando arquivos em ZIP...",
+      stage: "compactando_zip",
+      detail: "Reunindo todos os PDFs gerados em um único arquivo.",
+    });
 
     const zipName = `${this.sanitizeFileName(baseName)}_${this.getDateStamp()}.zip`;
     const zipPath = this.getUniqueFilePath(path.join(jobDir, zipName));
@@ -633,6 +803,15 @@ export class CardGenerator extends EventEmitter {
       JSON.stringify({ jobId, cards }, null, 2),
       "utf8"
     );
+
+    this.emitProgress({
+      processed,
+      total,
+      percentage: 100,
+      currentCard: "Finalizado",
+      stage: "finalizado",
+      detail: "Todos os cards foram gerados e compactados.",
+    });
 
     return {
       zipPath,

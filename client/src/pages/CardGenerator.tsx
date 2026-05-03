@@ -311,6 +311,8 @@ export default function CardGenerator() {
   const [isGeneratingJournal, setIsGeneratingJournal] = useState(false);
   const [journalProgress, setJournalProgress] = useState({ step: 0, message: "" });
   const [journalError, setJournalError] = useState<string | null>(null);
+  const [journalDownloadUrl, setJournalDownloadUrl] = useState<string | null>(null);
+  const [journalDownloadFileName, setJournalDownloadFileName] = useState<string>("jornal-diagramado.pdf");
 
   const socketRef = useRef<Socket | null>(null);
   const journalRef = useRef<HTMLDivElement>(null);
@@ -444,6 +446,8 @@ export default function CardGenerator() {
 
     setIsGeneratingJournal(true);
     setJournalError(null);
+    setJournalDownloadUrl(null);
+    setJournalDownloadFileName("jornal-diagramado.pdf");
     setJournalProgress({ step: 5, message: "Iniciando geração do jornal diagramado..." });
 
     const controller = new AbortController();
@@ -534,12 +538,11 @@ export default function CardGenerator() {
         throw new Error("PDF gerado, mas o servidor não retornou o link de download.");
       }
 
-      setJournalProgress({ step: 100, message: "Concluído! Iniciando download..." });
+      const downloadUrl = json.downloadUrl || `/api/journal/download?pdfPath=${encodeURIComponent(json.pdfPath)}`;
 
-      window.setTimeout(() => {
-        window.location.href = json.pdfUrl;
-        setIsGeneratingJournal(false);
-      }, 900);
+      setJournalDownloadUrl(downloadUrl);
+      setJournalDownloadFileName(json.fileName || "jornal-diagramado.pdf");
+      setJournalProgress({ step: 100, message: "PDF pronto para download." });
     } catch (err) {
       if (fakeProgressTimer) {
         window.clearInterval(fakeProgressTimer);
@@ -567,6 +570,10 @@ export default function CardGenerator() {
     setShowJournal(false);
     setError(null);
     setIsProcessing(false);
+    setIsGeneratingJournal(false);
+    setJournalError(null);
+    setJournalDownloadUrl(null);
+    setJournalDownloadFileName("jornal-diagramado.pdf");
   };
 
   return (
@@ -886,24 +893,28 @@ export default function CardGenerator() {
             <div className="mb-6 flex flex-col items-center text-center">
               <div
                 className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
-                  journalError ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+                  journalError ? "bg-red-50 text-red-600" : journalDownloadUrl ? "bg-teal-50 text-teal-600" : "bg-blue-50 text-blue-600"
                 }`}
               >
                 {journalError ? (
                   <AlertCircle className="h-8 w-8" />
+                ) : journalDownloadUrl ? (
+                  <CheckCircle2 className="h-8 w-8" />
                 ) : (
                   <FileText className="h-8 w-8 animate-pulse" />
                 )}
               </div>
 
               <h3 className="text-xl font-bold text-gray-900">
-                {journalError ? "Erro ao gerar o jornal" : "Gerando Jornal PDF"}
+                {journalError ? "Erro ao gerar o jornal" : journalDownloadUrl ? "Jornal PDF pronto" : "Gerando Jornal PDF"}
               </h3>
 
               <p className="mt-2 text-sm text-gray-500">
                 {journalError
                   ? "A geração foi interrompida. Veja a mensagem abaixo."
-                  : "Acompanhe cada etapa da geração do PDF diagramado."}
+                  : journalDownloadUrl
+                    ? "Clique no botão abaixo para baixar o arquivo PDF."
+                    : "Acompanhe cada etapa da geração do PDF diagramado."}
               </p>
             </div>
 
@@ -911,7 +922,7 @@ export default function CardGenerator() {
               <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
                 <div
                   className={`h-full transition-all duration-500 ease-out ${
-                    journalError ? "bg-red-600" : "bg-blue-600"
+                    journalError ? "bg-red-600" : journalDownloadUrl ? "bg-teal-600" : "bg-blue-600"
                   }`}
                   style={{ width: `${journalProgress.step}%` }}
                 />
@@ -920,7 +931,7 @@ export default function CardGenerator() {
               <div className="flex items-center justify-between gap-4 text-sm">
                 <span
                   className={`font-medium ${
-                    journalError ? "text-red-600" : "text-blue-600"
+                    journalError ? "text-red-600" : journalDownloadUrl ? "text-teal-600" : "text-blue-600"
                   }`}
                 >
                   {journalError || journalProgress.message}
@@ -928,10 +939,34 @@ export default function CardGenerator() {
                 <span className="shrink-0 text-gray-400">{journalProgress.step}%</span>
               </div>
 
-              {!journalError && (
+              {!journalError && !journalDownloadUrl && (
                 <div className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500">
                   Se a mensagem continuar mudando, a ferramenta ainda está trabalhando.
                   Se aparecer erro aqui, o problema será exibido sem travar a tela.
+                </div>
+              )}
+
+              {journalDownloadUrl && !journalError && (
+                <div className="space-y-3">
+                  <a
+                    href={journalDownloadUrl}
+                    download={journalDownloadFileName}
+                    className="flex h-11 w-full items-center justify-center rounded-xl bg-teal-600 text-sm font-bold text-white hover:bg-teal-700"
+                  >
+                    <Download className="mr-2 h-5 w-5" />
+                    Baixar PDF
+                  </a>
+
+                  <Button
+                    onClick={() => {
+                      setIsGeneratingJournal(false);
+                      setJournalDownloadUrl(null);
+                      setJournalProgress({ step: 0, message: "" });
+                    }}
+                    className="h-11 w-full rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  >
+                    Fechar
+                  </Button>
                 </div>
               )}
 

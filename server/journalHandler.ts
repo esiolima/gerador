@@ -1,21 +1,30 @@
-import express from "express";
+import { Express, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
-import puppeteer from "puppeteer-core";
+import puppeteer, { Browser } from "puppeteer-core";
 
 const OUTPUT_DIR = path.resolve("output");
-const PROJECT_ROOT = path.resolve();
 
-function assertInsideOutput(filePath: string) {
-  const resolved = path.resolve(filePath);
-  const outputResolved = path.resolve(OUTPUT_DIR);
-  if (!resolved.startsWith(outputResolved)) {
-    throw new Error("Acesso negado ao caminho solicitado.");
+function ensureDir(dir: string) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  return resolved;
 }
 
-function getChromiumExecutablePath() {
+function sanitizeFileName(value: string): string {
+  const safe =
+    String(value || "jornal-diagramado")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .toLowerCase()
+      .trim() || "jornal-diagramado";
+
+  return safe.endsWith(".pdf") ? safe : `${safe}.pdf`;
+}
+
+function getExecutablePath() {
   return (
     process.env.PUPPETEER_EXECUTABLE_PATH ||
     process.env.CHROME_BIN ||
@@ -24,72 +33,177 @@ function getChromiumExecutablePath() {
   );
 }
 
-function prepareHtmlForPdf(html: string) {
-  let preparedHtml = html.includes("<base")
-    ? html
-    : html.replace("<head>", `<head><base href="file://${PROJECT_ROOT}/">`);
+async function launchBrowser(): Promise<Browser> {
+  const executablePath = getExecutablePath();
 
-  preparedHtml = preparedHtml.replaceAll('src="/assets/', `src="file://${path.join(PROJECT_ROOT, "assets").replace(/\\/g, "/")}/`);
-  preparedHtml = preparedHtml.replaceAll('src="/fonts/', `src="file://${path.join(PROJECT_ROOT, "fonts").replace(/\\/g, "/")}/`);
-  return preparedHtml;
+  console.log(`[JournalHandler] Launching browser with: ${executablePath}`);
+
+  return puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-extensions",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-features=Translate,BackForwardCache,AcceptCHFrame",
+      "--no-first-run",
+      "--no-zygote",
+    ],
+  });
 }
 
-export function setupJournalRoute(app: express.Express) {
-  app.post("/api/journal/pdf", async (req, res) => {
-    const { html, jobId, fileName } = req.body ?? {};
-    if (!html || typeof html !== "string") {
-      return res.status(400).json({ error: "HTML inválido." });
-    }
+function buildSafeHtml(html: string) {
+  return String(html || "").replace(
+    "</head>",
+    `
+<style id="journal-pdf-safety">
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
 
-    const safeJobId = String(jobId || `journal_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, "");
-    const jobDir = path.join(OUTPUT_DIR, safeJobId);
-    if (!fs.existsSync(jobDir)) fs.mkdirSync(jobDir, { recursive: true });
+  body {
+    width: 2400px;
+    overflow: visible !important;
+  }
 
-    const finalPdfPath = assertInsideOutput(path.join(jobDir, fileName || "jornal.pdf"));
-    const htmlPath = path.join(jobDir, "temp_render.html");
+  .journal-page-label {
+    display: none !important;
+  }
 
-    fs.writeFileSync(htmlPath, prepareHtmlForPdf(html), "utf8");
+  .journal-page,
+  .journal-flow-page {
+    width: 2400px !important;
+    min-height: 4267px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
 
-    let browser: any = null;
+  .journal-page:last-child,
+  .journal-flow-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+</style>
+</head>`
+  );
+}
+
+export function setupJournalRoute(app: Express) {
+  ensureDir(OUTPUT_DIR);
+
+  app.post("/api/journal/pdf", async (req: Request, res: Response) => {
+    let browser: Browser | null = null;
+
     try {
-      browser = await puppeteer.launch({
-        executable_path: getChromiumExecutablePath(),
-        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-        headless: true,
+      const html = String(req.body?.html || "");
+      const jobId = String(req.body?.jobId || `journal_${Date.now()}`);
+      const requestedFileName = String(req.body?.fileName || "jornal-diagramado.pdf");
+
+      if (!html.trim()) {
+        return res.status(400).json({
+          success: false,
+          error: "HTML do jornal não foi recebido pelo servidor.",
+        });
+      }
+
+      const jobDir = path.join(OUTPUT_DIR, jobId);
+      ensureDir(jobDir);
+
+      const pdfName = sanitizeFileName(requestedFileName.replace(/\.zip$/i, ""));
+      const pdfPath = path.join(jobDir, pdfName);
+
+      browser = await launchBrowser();
+      const page = await browser.newPage();
+
+      page.on("console", (msg) => {
+        const text = msg.text();
+        if (text.toLowerCase().includes("erro") || text.toLowerCase().includes("error")) {
+          console.log(`[JournalHandler][console] ${text}`);
+        }
       });
 
-      const page = await browser.newPage();
-      await page.setViewport({ width: 2400, height: 3500 });
-      await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0", timeout: 60000 });
+      page.on("pageerror", (error) => {
+        console.error("[JournalHandler][pageerror]", error);
+      });
+
+      await page.setViewport({
+        width: 2400,
+        height: 4267,
+        deviceScaleFactor: 1,
+      });
+
+      await page.setContent(buildSafeHtml(html), {
+        waitUntil: "load",
+        timeout: 90000,
+      });
+
+      await page.evaluate(async () => {
+        // @ts-ignore
+        if (document.fonts?.ready) await document.fonts.ready;
+
+        const images = Array.from(document.images);
+
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) return Promise.resolve();
+
+            return new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 5000);
+            });
+          })
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      });
 
       await page.pdf({
-        path: finalPdfPath,
-        printBackground: true,
+        path: pdfPath,
         width: "2400px",
-        height: "3500px", // Tamanho fixo estável
-        margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" }
+        height: "4267px",
+        printBackground: true,
+        preferCSSPageSize: false,
+        margin: {
+          top: "0px",
+          right: "0px",
+          bottom: "0px",
+          left: "0px",
+        },
+        timeout: 120000,
       });
 
-      return res.json({ 
-        success: true, 
-        pdfUrl: `/api/journal/download?path=${encodeURIComponent(finalPdfPath)}` 
-      });
+      await page.close().catch(() => {});
 
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return res.json({
+        success: true,
+        pdfPath,
+        pdfUrl: `/output/${jobId}/${pdfName}`,
+        fileName: pdfName,
+      });
+    } catch (error) {
+      console.error("[JournalHandler] Erro ao gerar PDF do jornal:", error);
+
+      return res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro ao gerar PDF do jornal diagramado.",
+      });
     } finally {
-      if (browser) await browser.close();
-      if (fs.existsSync(htmlPath)) fs.unlinkSync(htmlPath);
-    }
-  });
-
-  app.get("/api/journal/download", (req, res) => {
-    const requested = req.query.path as string;
-    try {
-      const resolved = assertInsideOutput(requested);
-      return res.download(resolved);
-    } catch {
-      return res.status(403).send("Acesso negado.");
+      if (browser) {
+        await browser.close().catch(() => {});
+      }
     }
   });
 }

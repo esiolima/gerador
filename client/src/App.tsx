@@ -35,7 +35,7 @@ function HeaderUser() {
 
   // pega primeiro nome ou fallback do email
   const userName =
-    user?.name?.split(" ")[0] || user?.email?.split("@")[0];
+    user?.name || user?.email?.split("@")[0];
 
   return (
     <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg text-white text-sm shadow-lg border border-white/10">

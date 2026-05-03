@@ -12,6 +12,9 @@ import LogoManager from "./pages/LogoManager";
 import { AuthProvider, useAuth } from "@/auth/useAuth";
 import AuthGuard from "@/auth/AuthGuard";
 
+// ✅ ÍCONE LOGOUT
+import { LogOut } from "lucide-react";
+
 function Router() {
   return (
     <Switch>
@@ -24,21 +27,29 @@ function Router() {
   );
 }
 
-// 🔥 HEADER USUÁRIO (CORRIGIDO)
+// 🔥 HEADER USUÁRIO (ATUALIZADO)
 function HeaderUser() {
   const { user, logout } = useAuth();
 
   if (!user) return null;
 
+  // pega primeiro nome ou fallback do email
+  const userName =
+    user?.name?.split(" ")[0] || user?.email?.split("@")[0];
+
   return (
-    <div className="fixed top-4 right-4 z-50 bg-black/70 backdrop-blur px-4 py-2 rounded-lg text-white text-sm flex items-center gap-3 shadow-lg">
-      <span className="text-white/80">{user.email}</span>
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg text-white text-sm shadow-lg border border-white/10">
+      
+      <span className="text-white/80 font-medium">
+        {userName}
+      </span>
 
       <button
         onClick={logout}
-        className="text-red-400 hover:text-red-300 font-semibold"
+        className="text-gray-400 hover:text-red-400 transition"
+        title="Sair"
       >
-        Sair
+        <LogOut size={16} />
       </button>
     </div>
   );

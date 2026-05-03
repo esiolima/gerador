@@ -23,6 +23,10 @@ type ProgressData = {
   processed: number;
   percentage: number;
   currentCard: string;
+  stage?: string;
+  detail?: string;
+  currentIndex?: number;
+  updatedAt?: string;
 };
 
 type GeneratedCard = {
@@ -309,7 +313,13 @@ export default function CardGenerator() {
   );
 
   const [isGeneratingJournal, setIsGeneratingJournal] = useState(false);
-  const [journalProgress, setJournalProgress] = useState({ step: 0, message: "" });
+  const [journalProgress, setJournalProgress] = useState({
+    step: 0,
+    message: "",
+    detail: "",
+    elapsedSeconds: 0,
+  });
+  const [journalError, setJournalError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const journalRef = useRef<HTMLDivElement>(null);
@@ -442,11 +452,43 @@ export default function CardGenerator() {
     if (!journalRef.current || !result) return;
 
     setIsGeneratingJournal(true);
-    setJournalProgress({ step: 10, message: "Iniciando geração do jornal..." });
+    setJournalError(null);
+    setJournalProgress({
+      step: 5,
+      message: "Iniciando geração do jornal...",
+      detail: "Preparando o editor visual para exportação.",
+      elapsedSeconds: 0,
+    });
+
+    let progressTimer: ReturnType<typeof window.setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof window.setTimeout> | null = null;
+
+    const controller = new AbortController();
+    const startedAt = Date.now();
+
+    const updateJournalProgress = (step: number, message: string, detail: string) => {
+      setJournalProgress({
+        step,
+        message,
+        detail,
+        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      });
+    };
 
     try {
+      updateJournalProgress(
+        10,
+        "Capturando páginas do jornal...",
+        "Lendo capa, página de cards, anúncio, imagens trocadas e textos editáveis."
+      );
+
       const serializedJournal = serializeJournalForPdf(journalRef.current);
-      setJournalProgress({ step: 30, message: "Preparando conteúdo das páginas..." });
+
+      updateJournalProgress(
+        25,
+        "Montando HTML final...",
+        "Preparando o arquivo completo que será enviado ao servidor."
+      );
 
       const journalHtml = `<!doctype html>
 <html>
@@ -459,7 +501,41 @@ export default function CardGenerator() {
 </body>
 </html>`;
 
-      setJournalProgress({ step: 50, message: "Processando páginas e ajustando dimensões..." });
+      updateJournalProgress(
+        40,
+        "Enviando jornal para o servidor...",
+        "O servidor vai abrir o Chromium e transformar as páginas em PDF."
+      );
+
+      timeoutTimer = window.setTimeout(() => {
+        controller.abort();
+      }, 240000);
+
+      const serverMessages = [
+        "Renderizando páginas no Chromium...",
+        "Ajustando dimensões das páginas...",
+        "Processando imagens e fontes...",
+        "Gerando páginas do PDF...",
+        "Finalizando arquivo do jornal...",
+      ];
+
+      progressTimer = window.setInterval(() => {
+        setJournalProgress((previous) => {
+          const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+          const nextStep = Math.min(previous.step + 1, 95);
+          const messageIndex = Math.min(
+            Math.floor(Math.max(nextStep - 45, 0) / 10),
+            serverMessages.length - 1
+          );
+
+          return {
+            step: nextStep,
+            message: serverMessages[messageIndex],
+            detail: `Ainda trabalhando. Tempo decorrido: ${elapsedSeconds}s.`,
+            elapsedSeconds,
+          };
+        });
+      }, 1200);
 
       const response = await fetch("/api/journal/pdf", {
         method: "POST",
@@ -469,26 +545,63 @@ export default function CardGenerator() {
           jobId: result?.jobId,
           fileName: result?.fileName,
         }),
+        signal: controller.signal,
       });
 
-      setJournalProgress({ step: 80, message: "Mesclando arquivos e finalizando PDF..." });
+      if (progressTimer) window.clearInterval(progressTimer);
+      if (timeoutTimer) window.clearTimeout(timeoutTimer);
 
-      const json = await response.json();
+      updateJournalProgress(
+        96,
+        "Recebendo resposta do servidor...",
+        "Validando o PDF gerado antes do download."
+      );
 
-      if (!response.ok) {
-        throw new Error(json.error || "Erro ao gerar PDF do jornal.");
+      const responseText = await response.text();
+      let json: any = {};
+
+      try {
+        json = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        throw new Error(
+          `O servidor respondeu com um conteúdo inválido. Resposta: ${responseText.slice(0, 180)}`
+        );
       }
 
-      setJournalProgress({ step: 100, message: "Concluído! Iniciando download..." });
-      
-      setTimeout(() => {
+      if (!response.ok) {
+        throw new Error(json.error || json.message || "Erro ao gerar PDF do jornal.");
+      }
+
+      updateJournalProgress(
+        100,
+        "Concluído! Iniciando download...",
+        "PDF do jornal gerado com sucesso."
+      );
+
+      window.setTimeout(() => {
         window.location.href = json.pdfUrl;
         setIsGeneratingJournal(false);
-      }, 1000);
-
+      }, 700);
     } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Erro ao gerar PDF do jornal.");
+      if (progressTimer) window.clearInterval(progressTimer);
+      if (timeoutTimer) window.clearTimeout(timeoutTimer);
+
+      const message =
+        err instanceof DOMException && err.name === "AbortError"
+          ? "A geração do jornal demorou demais e foi interrompida. O servidor provavelmente travou ao gerar o PDF."
+          : err instanceof Error
+            ? err.message
+            : "Erro ao gerar PDF do jornal.";
+
+      console.error("[generateJournalPdf]", err);
+      setJournalError(message);
+      setJournalProgress({
+        step: 100,
+        message: "Erro ao gerar PDF",
+        detail: message,
+        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      });
+      window.alert(message);
       setIsGeneratingJournal(false);
     }
   };
@@ -499,6 +612,7 @@ export default function CardGenerator() {
     setProgress(null);
     setShowJournal(false);
     setError(null);
+    setJournalError(null);
     setIsProcessing(false);
   };
 
@@ -615,12 +729,22 @@ export default function CardGenerator() {
                   <p className="text-white/45">
                     {progress.currentCard || `${progress.processed}/${progress.total}`}
                   </p>
+                  {progress.stage && (
+                    <p className="mt-1 text-xs font-bold uppercase tracking-wide text-blue-300">
+                      Etapa: {progress.stage.replaceAll("_", " ")}
+                    </p>
+                  )}
+                  {progress.detail && (
+                    <p className="mt-1 text-xs text-white/35">
+                      {progress.detail}
+                    </p>
+                  )}
                 </div>
 
                 <div className="h-3 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${progress.percentage}%` }}
+                    style={{ width: `${Math.max(0, Math.min(progress.percentage, 100))}%` }}
                   />
                 </div>
 
@@ -685,6 +809,12 @@ export default function CardGenerator() {
                   Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as
                   imagens.
                 </p>
+                {journalError && (
+                  <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
+                    <AlertCircle className="mr-2 inline h-4 w-4" />
+                    {journalError}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -821,7 +951,9 @@ export default function CardGenerator() {
                 <FileText className="h-8 w-8 animate-pulse" />
               </div>
               <h3 className="text-xl font-bold text-gray-900">Gerando Jornal PDF</h3>
-              <p className="mt-2 text-sm text-gray-500">Isso pode levar alguns segundos dependendo da quantidade de cards.</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Acompanhe a etapa atual abaixo. Se houver erro, a mensagem aparecerá na tela.
+              </p>
             </div>
 
             <div className="space-y-4">
@@ -835,6 +967,16 @@ export default function CardGenerator() {
                 <span className="font-medium text-blue-600">{journalProgress.message}</span>
                 <span className="text-gray-400">{journalProgress.step}%</span>
               </div>
+              {journalProgress.detail && (
+                <p className="text-center text-xs leading-relaxed text-gray-500">
+                  {journalProgress.detail}
+                </p>
+              )}
+              {journalProgress.elapsedSeconds > 0 && (
+                <p className="text-center text-xs text-gray-400">
+                  Tempo decorrido: {journalProgress.elapsedSeconds}s
+                </p>
+              )}
             </div>
           </div>
         </div>

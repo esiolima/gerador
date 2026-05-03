@@ -13,6 +13,8 @@ import { serveStatic, setupVite } from "./vite";
 import { setupUploadRoute } from "../uploadHandler";
 import { setupLogoUploadRoute } from "../logoUploadHandler";
 import { setupJournalRoute } from "../journalHandler";
+import { setupAuthRoutes } from "../auth/authRoutes";
+import { authMiddleware } from "../auth/authMiddleware";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -52,6 +54,10 @@ async function startServer() {
 
   registerOAuthRoutes(app);
 
+  await setupAuthRoutes(app);
+
+  app.use("/api", authMiddleware);
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -80,6 +86,7 @@ async function startServer() {
   app.use("/output", express.static(path.resolve("output")));
   app.use("/assets", express.static(path.resolve("assets")));
   app.use("/fonts", express.static(path.resolve("fonts")));
+  app.use("/logos", express.static(path.resolve("logos")));
 
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
@@ -118,15 +125,15 @@ async function startServer() {
   });
 }
 
-  process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  });
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
 
-  process.on("uncaughtException", (error) => {
-    console.error("Uncaught Exception:", error);
-  });
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+});
 
-  startServer().catch((error) => {
+startServer().catch((error) => {
   console.error("Failed to start server:", error);
   process.exit(1);
 });

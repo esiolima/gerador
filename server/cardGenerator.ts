@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import puppeteer, { Browser } from "puppeteer-core";
+import puppeteer, { Browser, Page } from "puppeteer-core";
 import archiver from "archiver";
 import xlsx from "xlsx";
 import { EventEmitter } from "events";
@@ -50,27 +50,33 @@ export class CardGenerator extends EventEmitter {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     }
 
-    const executablePath = 
+    const executablePath =
       process.env.PUPPETEER_EXECUTABLE_PATH ||
       process.env.CHROME_BIN ||
       process.env.CHROMIUM_PATH ||
       "/usr/bin/chromium";
-    
+
     console.log(`[CardGenerator] Launching browser with: ${executablePath}`);
 
     this.browser = await puppeteer.launch({
       executablePath,
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--font-render-hinting=none",
         "--disable-gpu",
-        "--single-process",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-renderer-backgrounding",
+        "--disable-features=Translate,BackForwardCache,AcceptCHFrame",
+        "--no-first-run",
+        "--no-zygote",
       ],
-      headless: true,
     });
-    
+
     console.log("[CardGenerator] Browser launched successfully");
   }
 
@@ -151,7 +157,7 @@ export class CardGenerator extends EventEmitter {
 
     let mimeType = `image/${ext}`;
     if (ext === "svg") mimeType = "image/svg+xml";
-    if (ext === "jpg" || ext === "jfif") mimeType = "image/jpeg";
+    if (ext === "jpg" || ext === "jfif" || ext === "jpeg") mimeType = "image/jpeg";
     if (ext === "avif") mimeType = "image/avif";
 
     return `data:${mimeType};base64,${buffer.toString("base64")}`;
@@ -210,7 +216,7 @@ export class CardGenerator extends EventEmitter {
 
       if (!tipo || !VALID_TYPES.includes(tipo)) {
         throw new Error(
-          `Erro na linha ${line}: tipo "${row.tipo}" não reconhecido. Use promocao, cupom, cashback ou queda.`
+          `Erro na linha ${line}: tipo "${row.tipo}" não reconhecido. Use promocao, cupom, cashback, queda ou bc.`
         );
       }
 
@@ -233,6 +239,9 @@ export class CardGenerator extends EventEmitter {
     width:700px;
     min-width:700px;
     max-width:700px;
+    height:1058px;
+    min-height:1058px;
+    max-height:1058px;
     margin:0;
     padding:0;
     overflow:hidden;
@@ -251,18 +260,11 @@ export class CardGenerator extends EventEmitter {
     overflow:hidden;
   }
 
-  .logo img,
-  .selo img,
-  #selo-img {
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:block;
-  }
-
   .logo img[src=""],
-  .logo img:not([src]) {
-    display:none;
+  .logo img:not([src]),
+  .selo img[src=""],
+  .selo img:not([src]) {
+    display:none !important;
   }
 
   #valor-texto,
@@ -275,49 +277,61 @@ export class CardGenerator extends EventEmitter {
 <script>
 (function(){
   function fitText(el, container, opts){
-    if(!el || !container) return;
+    try {
+      if(!el || !container) return;
 
-    var max = opts.max || 480;
-    var min = opts.min || 10;
+      var max = opts.max || 480;
+      var min = opts.min || 10;
+      var limit = opts.limit || 700;
+      var count = 0;
 
-    el.style.display = "block";
-    el.style.maxWidth = "100%";
-    el.style.textAlign = "center";
-    el.style.whiteSpace = opts.nowrap ? "nowrap" : "normal";
-    el.style.wordBreak = "keep-all";
-    el.style.overflowWrap = "normal";
-    el.style.lineHeight = opts.lineHeight || "0.92";
+      el.style.display = "block";
+      el.style.maxWidth = "100%";
+      el.style.textAlign = "center";
+      el.style.whiteSpace = opts.nowrap ? "nowrap" : "normal";
+      el.style.wordBreak = "keep-all";
+      el.style.overflowWrap = "normal";
+      el.style.lineHeight = opts.lineHeight || "0.92";
 
-    for(var size = max; size >= min; size--){
-      el.style.fontSize = size + "px";
+      for(var size = max; size >= min && count < limit; size--){
+        el.style.fontSize = size + "px";
 
-      if(
-        el.scrollWidth <= container.clientWidth &&
-        el.scrollHeight <= container.clientHeight
-      ){
-        break;
+        if(
+          el.scrollWidth <= container.clientWidth &&
+          el.scrollHeight <= container.clientHeight
+        ){
+          break;
+        }
+
+        count++;
       }
+    } catch(e) {
+      console.error("[fitText] erro:", e);
     }
   }
 
   function run(){
-    fitText(
-      document.getElementById("valor-texto") || document.querySelector(".valor-texto"),
-      document.getElementById("valor-container") || document.querySelector(".valor-container"),
-      { max: 520, min: 22, nowrap: false, lineHeight: "0.9" }
-    );
+    try {
+      fitText(
+        document.getElementById("valor-texto") || document.querySelector(".valor-texto"),
+        document.getElementById("valor-container") || document.querySelector(".valor-container"),
+        { max: 520, min: 22, nowrap: false, lineHeight: "0.9", limit: 600 }
+      );
 
-    fitText(
-      document.getElementById("cupom-text"),
-      document.querySelector(".cupom-codigo"),
-      { max: 120, min: 18, nowrap: true, lineHeight: "1" }
-    );
+      fitText(
+        document.getElementById("cupom-text"),
+        document.querySelector(".cupom-codigo"),
+        { max: 120, min: 18, nowrap: true, lineHeight: "1", limit: 160 }
+      );
+    } catch(e) {
+      console.error("[__fitCards] erro:", e);
+    }
   }
 
   window.__fitCards = run;
 
   if(document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(run);
+    document.fonts.ready.then(run).catch(function(){ run(); });
   } else {
     window.addEventListener("load", run);
   }
@@ -360,33 +374,49 @@ export class CardGenerator extends EventEmitter {
       .replaceAll("{{SELO}}", seloBase64);
   }
 
-  private async waitForPageReady(page: any) {
+  private async waitForPageReady(page: Page) {
     await page.evaluate(async () => {
-      // @ts-ignore
-      if (document.fonts?.ready) await document.fonts.ready;
+      try {
+        // @ts-ignore
+        if (document.fonts?.ready) await document.fonts.ready;
 
-      const images = Array.from(document.images);
+        const images = Array.from(document.images);
 
-      await Promise.all(
-        images.map((img) => {
-          if (img.complete) return Promise.resolve();
+        await Promise.all(
+          images.map((img) => {
+            if (img.complete) return Promise.resolve();
 
-          return new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          });
-        })
-      );
+            return new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+              setTimeout(resolve, 3000);
+            });
+          })
+        );
 
-      // @ts-ignore
-      if (window.__fitCards) window.__fitCards();
+        // @ts-ignore
+        if (window.__fitCards) window.__fitCards();
+
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      } catch (error) {
+        console.error("[waitForPageReady] erro:", error);
+      }
     });
+  }
+
+  private async ensureBrowserAlive() {
+    if (!this.browser || !this.browser.connected) {
+      this.browser = null;
+      await this.initialize();
+    }
   }
 
   async generateCards(
     excelFilePath: string,
     originalFileName?: string
   ): Promise<GenerateCardsResult> {
+    await this.ensureBrowserAlive();
+
     if (!this.browser) throw new Error("Browser not initialized");
 
     const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -408,11 +438,16 @@ export class CardGenerator extends EventEmitter {
     let processed = 0;
     const cards: GeneratedCard[] = [];
 
-    const BATCH_SIZE = 1; // Processar 1 por vez para estabilidade máxima em servidores pequenos
+    const BATCH_SIZE = 1;
+
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
-      
+
       for (const [batchIndex, row] of batch.entries()) {
+        await this.ensureBrowserAlive();
+
+        if (!this.browser) throw new Error("Browser not initialized");
+
         const index = i + batchIndex;
         const tipo = this.normalizeType(row.tipo);
         const templatePath = path.join(TEMPLATES_DIR, `${tipo}.html`);
@@ -422,7 +457,9 @@ export class CardGenerator extends EventEmitter {
         }
 
         const logoFile = this.findLogoFile(row.logo);
-        const logoBase64 = logoFile ? this.imageToBase64(path.join(LOGOS_DIR, logoFile)) : "";
+        const logoBase64 = logoFile
+          ? this.imageToBase64(path.join(LOGOS_DIR, logoFile))
+          : "";
         const hasLogo = Boolean(logoBase64);
 
         const seloRaw = String(row.selo ?? "").trim().toLowerCase();
@@ -469,21 +506,32 @@ export class CardGenerator extends EventEmitter {
         fs.writeFileSync(tmpHtmlPath, html, "utf8");
         fs.writeFileSync(htmlPath, html, "utf8");
 
-        let page;
+        let page: Page | null = null;
+
         try {
-          // Reutiliza a primeira página aberta ou cria uma nova se necessário
-          const pages = await this.browser!.pages();
-          page = pages.length > 0 ? pages[0] : await this.browser!.newPage();
+          console.log(`[CardGenerator] Gerando card ${index + 1}/${total} - tipo: ${tipo}`);
+
+          page = await this.browser.newPage();
+
+          page.on("console", (msg) => {
+            const text = msg.text();
+            if (text.includes("erro") || text.includes("Error")) {
+              console.log(`[CardGenerator][console][card ${index + 1}] ${text}`);
+            }
+          });
+
+          page.on("pageerror", (error) => {
+            console.error(`[CardGenerator][pageerror][card ${index + 1}]`, error);
+          });
 
           await page.setViewport({
             width: 700,
             height: 1058,
-            deviceScaleFactor: 1.5, // Reduzido levemente de 2 para 1.5 para economizar memória
+            deviceScaleFactor: 1,
           });
 
-          // Navega com retry simples para evitar o "detached"
-          await page.goto(`file://${tmpHtmlPath}`, {
-            waitUntil: "load", // Mudado de networkidle0 para load para ser mais rápido
+          await page.setContent(html, {
+            waitUntil: "load",
             timeout: 60000,
           });
 
@@ -494,7 +542,12 @@ export class CardGenerator extends EventEmitter {
             width: "700px",
             height: "1058px",
             printBackground: true,
-            margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+            margin: {
+              top: "0px",
+              right: "0px",
+              bottom: "0px",
+              left: "0px",
+            },
           });
 
           await page.screenshot({
@@ -505,10 +558,17 @@ export class CardGenerator extends EventEmitter {
         } catch (pageErr) {
           console.error(`[CardGenerator] Erro no card ${index + 1}:`, pageErr);
           throw pageErr;
+        } finally {
+          if (page) {
+            try {
+              await page.close();
+            } catch {
+              // Ignora erro ao fechar página
+            }
+          }
         }
 
-        // Não fechamos a página aqui para reusá-la no próximo card do loop
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise((resolve) => setTimeout(resolve, 150));
 
         processed++;
 
@@ -528,7 +588,7 @@ export class CardGenerator extends EventEmitter {
           pdfUrl: `/output/${jobId}/${pdfName}`,
           pngUrl: `/output/${jobId}/${pngName}`,
           htmlUrl: `/output/${jobId}/${htmlName}`,
-          html
+          html,
         };
 
         cards.push(card);

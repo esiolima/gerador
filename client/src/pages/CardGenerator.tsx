@@ -766,26 +766,32 @@ export default function CardGenerator() {
             )}
 
             {isProcessing && progress && (
-              <div className="space-y-6 py-6 text-center">
-                <Hourglass className="mx-auto h-12 w-12 animate-spin text-sky-400" />
+              <div className="space-y-8 py-8 text-center">
+                <div className="relative mx-auto h-16 w-16">
+                  <div className="absolute inset-0 rounded-full border border-white/10" />
+                  <div className="absolute inset-2 rounded-full border border-sky-400/40 animate-pulse" />
+                  <Hourglass className="relative z-10 mx-auto h-10 w-10 text-sky-400 animate-spin" />
+                </div>
 
                 <div>
-                  <h2 className="text-2xl font-black">Processando cards</h2>
-                  <p className="text-white/45">
-                    {progress.processed} de {progress.total}
-                  </p>
-                </div>
-   
-                <div className="h-3 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${progress.percentage}%` }}
-                  />
+                  <h2 className="text-2xl font-black tracking-tight">
+                    Processando cards
+                  </h2>
                 </div>
 
-                <p className="text-sm text-white/45">
-                  {progress.processed} de {progress.total || "..."} cards processados
-                </p>
+                <div className="space-y-3">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-500 transition-all duration-500 ease-out"
+                      style={{ width: `${progress.percentage}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between px-1 text-xs text-white/35">
+                    <span>{progress.processed}</span>
+                    <span>{progress.total || "..."}</span>
+                  </div>
+                </div>
               </div>
             )}
 

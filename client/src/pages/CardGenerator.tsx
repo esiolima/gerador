@@ -358,6 +358,8 @@ function buildJournalPagesForPdf(journalElement: HTMLDivElement): JournalPagePay
 }
 
 const PAGE_BACKGROUND_STORAGE_KEY = "jornal_page_background";
+const CATEGORY_BACKGROUNDS_STORAGE_KEY = "jornal_category_backgrounds";
+const DEFAULT_JOURNAL_BACKGROUND = "#ffffff";
 
 export default function CardGenerator() {
   const [file, setFile] = useState<File | null>(null);
@@ -376,11 +378,23 @@ export default function CardGenerator() {
   const [coverImage, setCoverImage] = useState<string>("/assets/capa.png");
   const [headerImage, setHeaderImage] = useState<string>("/assets/header.png");
   const [adImage, setAdImage] = useState<string>("/assets/anuncio.png");
-  const [pageBackground, setPageBackground] = useState<string>(() => {
-    if (typeof window === "undefined") return "#ffffff";
+  const [categoryBackgrounds, setCategoryBackgrounds] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return { __default: DEFAULT_JOURNAL_BACKGROUND };
 
-    return window.localStorage.getItem(PAGE_BACKGROUND_STORAGE_KEY) || "#ffffff";
+    const previousGlobalBackground =
+      window.localStorage.getItem(PAGE_BACKGROUND_STORAGE_KEY) || DEFAULT_JOURNAL_BACKGROUND;
+
+    try {
+      const saved = window.localStorage.getItem(CATEGORY_BACKGROUNDS_STORAGE_KEY);
+      if (!saved) return { __default: previousGlobalBackground };
+
+      const parsed = JSON.parse(saved) as Record<string, string>;
+      return { __default: previousGlobalBackground, ...parsed };
+    } catch {
+      return { __default: previousGlobalBackground };
+    }
   });
+  const [journalZoom, setJournalZoom] = useState<number>(30);
 
   const [footerText, setFooterText] = useState(
     "Ofertas válidas enquanto durarem os estoques. Consulte condições, disponibilidade e regulamento nos canais oficiais."
@@ -407,14 +421,44 @@ export default function CardGenerator() {
     () => buildJournalCardPages(groupedCards),
     [groupedCards]
   );
-  const footerTextColor = useMemo(
-    () => getReadableTextColor(pageBackground),
-    [pageBackground]
-  );
-  const footerBorderColor =
-    footerTextColor === "#ffffff"
-      ? "rgba(255,255,255,.38)"
-      : "rgba(0,0,0,.16)";
+  const getCategoryBackground = (category: string) =>
+    categoryBackgrounds[category] || categoryBackgrounds.__default || DEFAULT_JOURNAL_BACKGROUND;
+
+  const updateCategoryBackground = (category: string, color: string) => {
+    setCategoryBackgrounds((current) => ({
+      ...current,
+      [category]: color,
+    }));
+  };
+
+  const updateJournalZoom = (nextZoom: number) => {
+    const safeZoom = Math.min(100, Math.max(15, Math.round(nextZoom || 30)));
+    setJournalZoom(safeZoom);
+  };
+
+  const errorLines = useMemo(() => {
+    if (!error) return [];
+
+    return error
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }, [error]);
+
+  const isSpreadsheetValidationError = useMemo(() => {
+    if (!error) return false;
+
+    const normalizedError = error.toLowerCase();
+
+    return (
+      errorLines.length > 1 ||
+      normalizedError.includes("linha ") ||
+      normalizedError.includes("coluna obrigatória") ||
+      normalizedError.includes("planilha") ||
+      normalizedError.includes("ordem") ||
+      normalizedError.includes("cupom")
+    );
+  }, [error, errorLines]);
 
   useEffect(() => {
     const socket = io({
@@ -432,7 +476,6 @@ export default function CardGenerator() {
 
     socket.on("error", (message: string) => {
       setError(message);
-      window.alert(message);
       setIsProcessing(false);
     });
 
@@ -444,8 +487,11 @@ export default function CardGenerator() {
   }, [sessionId]);
 
   useEffect(() => {
-    window.localStorage.setItem(PAGE_BACKGROUND_STORAGE_KEY, pageBackground);
-  }, [pageBackground]);
+    window.localStorage.setItem(
+      CATEGORY_BACKGROUNDS_STORAGE_KEY,
+      JSON.stringify(categoryBackgrounds)
+    );
+  }, [categoryBackgrounds]);
 
   const handleFileSelect = (selectedFile: File | null | undefined) => {
     if (!selectedFile) return;
@@ -453,7 +499,6 @@ export default function CardGenerator() {
     if (!selectedFile.name.toLowerCase().endsWith(".xlsx")) {
       const message = "Arquivo inválido: envie uma planilha no formato .xlsx.";
       setError(message);
-      window.alert(message);
       return;
     }
 
@@ -507,7 +552,6 @@ export default function CardGenerator() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao processar a planilha.";
       setError(message);
-      window.alert(message);
     } finally {
       setIsProcessing(false);
     }
@@ -720,7 +764,7 @@ export default function CardGenerator() {
                   <Upload className="mx-auto mb-4 h-12 w-12 text-sky-400" />
                   <p className="text-xl font-bold">Arraste ou selecione o Excel</p>
                   <p className="mt-2 text-sm text-white/40">
-                    Colunas extras serão ignoradas. Erros aparecem em popup.
+                    A planilha será validada antes da geração dos cards.
                   </p>
 
                   <input
@@ -740,9 +784,43 @@ export default function CardGenerator() {
                 )}
 
                 {error && (
-                  <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">
-                    <AlertCircle className="mr-2 inline h-4 w-4" />
-                    {error}
+                  <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-5 text-left shadow-lg shadow-red-950/10">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-200">
+                        <AlertCircle className="h-5 w-5" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-black uppercase tracking-wide text-red-100">
+                          {isSpreadsheetValidationError
+                            ? "A planilha precisa de ajustes"
+                            : "Não foi possível processar"}
+                        </h3>
+
+                        {errorLines.length > 1 ? (
+                          <div className="mt-3 max-h-52 space-y-2 overflow-auto pr-2">
+                            {errorLines.map((line, index) => (
+                              <div
+                                key={`${line}-${index}`}
+                                className="rounded-xl border border-red-300/10 bg-black/15 px-3 py-2 text-sm leading-relaxed text-red-100/90"
+                              >
+                                {line}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-red-100/90">
+                            {error}
+                          </p>
+                        )}
+
+                        {isSpreadsheetValidationError && (
+                          <p className="mt-3 text-xs leading-relaxed text-red-100/55">
+                            Corrija os pontos acima na planilha e envie o arquivo novamente.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -853,16 +931,26 @@ export default function CardGenerator() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <label className="flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-bold text-white hover:bg-white/15">
-                  <Palette className="h-5 w-5" />
-                  Fundo
-                  <input
-                    type="color"
-                    value={pageBackground}
-                    onChange={(event) => setPageBackground(event.target.value)}
-                    className="h-7 w-9 cursor-pointer rounded border-0 bg-transparent p-0"
-                  />
-                </label>
+                <div className="flex max-w-3xl flex-wrap items-center gap-2">
+                  {groupedCards.map(([category]) => (
+                    <label
+                      key={category}
+                      className="flex h-12 cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/15"
+                      title={`Fundo da categoria ${category}`}
+                    >
+                      <Palette className="h-4 w-4 shrink-0" />
+                      <span className="max-w-[150px] truncate">{category}</span>
+                      <input
+                        type="color"
+                        value={getCategoryBackground(category)}
+                        onChange={(event) =>
+                          updateCategoryBackground(category, event.target.value)
+                        }
+                        className="h-7 w-9 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                      />
+                    </label>
+                  ))}
+                </div>
 
                 <Button
                   disabled={isGeneratingJournal}
@@ -876,7 +964,13 @@ export default function CardGenerator() {
             </div>
 
             <div className="journal-preview-viewport">
-              <div className="journal-preview-scaler">
+              <div
+                className="journal-preview-scaler"
+                style={{
+                  width: `${1080 * (journalZoom / 100)}px`,
+                  transform: `scale(${journalZoom / 100})`,
+                }}
+              >
                 <div ref={journalRef} className="journal-root">
                   <div className="journal-page-label">Página 1 — Capa</div>
 
@@ -897,6 +991,12 @@ export default function CardGenerator() {
                     const nextPage = journalCardPages[pageIndex + 1];
                     const isLastPageOfCategory =
                       !nextPage || nextPage.category !== journalPage.category;
+                    const categoryBackground = getCategoryBackground(journalPage.category);
+                    const footerTextColor = getReadableTextColor(categoryBackground);
+                    const footerBorderColor =
+                      footerTextColor === "#ffffff"
+                        ? "rgba(255,255,255,.38)"
+                        : "rgba(0,0,0,.16)";
 
                     return (
                       <div
@@ -917,7 +1017,7 @@ export default function CardGenerator() {
                               ? `${journalPage.category} - continuação ${journalPage.pageIndexWithinCategory + 1}`
                               : journalPage.category
                           }
-                          style={{ background: pageBackground }}
+                          style={{ background: categoryBackground }}
                         >
                           {!journalPage.isContinuation && (
                             <>
@@ -985,6 +1085,39 @@ export default function CardGenerator() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="journal-zoom-controls" aria-label="Controle de zoom do visualizador">
+                <button
+                  type="button"
+                  onClick={() => updateJournalZoom(journalZoom - 5)}
+                  className="journal-zoom-button"
+                  aria-label="Diminuir zoom"
+                >
+                  −
+                </button>
+
+                <div className="journal-zoom-input-wrap">
+                  <input
+                    type="number"
+                    min={15}
+                    max={100}
+                    value={journalZoom}
+                    onChange={(event) => updateJournalZoom(Number(event.target.value))}
+                    className="journal-zoom-input"
+                    aria-label="Porcentagem de zoom"
+                  />
+                  <span>%</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => updateJournalZoom(journalZoom + 5)}
+                  className="journal-zoom-button"
+                  aria-label="Aumentar zoom"
+                >
+                  +
+                </button>
               </div>
             </div>
 
@@ -1153,6 +1286,7 @@ const journalCss = `
   }
 
   .journal-preview-viewport{
+    position:relative;
     width:100%;
     max-height:82vh;
     overflow:auto;
@@ -1175,6 +1309,67 @@ const journalCss = `
     flex-shrink:0;
     transform:scale(.30);
     transform-origin:top center;
+    transition:transform .22s ease, width .22s ease;
+  }
+
+  .journal-zoom-controls{
+    position:sticky;
+    top:18px;
+    z-index:30;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    margin-left:18px;
+    align-self:flex-start;
+    padding:10px;
+    border:1px solid rgba(0,0,0,.10);
+    border-radius:18px;
+    background:rgba(255,255,255,.92);
+    box-shadow:0 18px 40px rgba(15,23,42,.16);
+    backdrop-filter:blur(12px);
+  }
+
+  .journal-zoom-button{
+    width:38px;
+    height:38px;
+    border:0;
+    border-radius:12px;
+    background:#0f172a;
+    color:#fff;
+    font-size:22px;
+    font-weight:900;
+    line-height:1;
+    cursor:pointer;
+  }
+
+  .journal-zoom-button:hover{
+    background:#1d4ed8;
+  }
+
+  .journal-zoom-input-wrap{
+    display:flex;
+    width:70px;
+    height:38px;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    border-radius:12px;
+    background:#f1f5f9;
+    color:#0f172a;
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .journal-zoom-input{
+    width:40px;
+    border:0;
+    background:transparent;
+    text-align:right;
+    font-size:13px;
+    font-weight:900;
+    color:#0f172a;
+    outline:none;
   }
 
   .journal-root{
@@ -1313,15 +1508,23 @@ const journalCss = `
   .journal-grid{
     display:flex;
     flex-wrap:wrap;
-    gap:28px;
+    gap:20px;
     justify-content:center;
     align-content:flex-start;
     padding:20px 36px 36px 36px;
     box-sizing:border-box;
   }
 
+  .journal-category-page:not(.is-last-category-page){
+    padding-bottom:10px;
+  }
+
   .journal-category-page.is-continuation .journal-grid{
-    padding-top:54px;
+    padding-top:10px;
+  }
+
+  .journal-category-page.is-continuation:not(.is-last-category-page) .journal-grid{
+    padding-bottom:10px;
   }
 
   .journal-card-wrap{

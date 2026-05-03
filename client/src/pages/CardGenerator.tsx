@@ -811,7 +811,7 @@ export default function CardGenerator() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-sky-400" />
-              Gerador de Cards + Jornal Diagramado
+              Transforme Ações em Resultado
             </div>
 
             <h1 className="text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
@@ -819,7 +819,7 @@ export default function CardGenerator() {
               <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
                 argumento de venda
               </span>{" "}
-              prontas.
+              para divulgação.
             </h1>
 
             <p className="max-w-2xl text-lg text-white/55">

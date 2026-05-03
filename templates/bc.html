@@ -154,8 +154,8 @@ body {
 
 .valor-texto {
   font-weight: 900;
-  font-size: 270px;
-  line-height: 0.9;
+  font-size: clamp(120px, 25vw, 270px);
+  line-height: 0.85;
   white-space: nowrap;
   text-align: center;
   display: inline-block;
@@ -226,8 +226,8 @@ body {
       {{TEXTO}}
     </div>
 
-    <div class="valor-container" id="valor-container">
-      <div class="valor-texto" id="valor-texto">
+    <div class="valor-container">
+      <div class="valor-texto">
         {{VALOR}}%
       </div>
     </div>
@@ -259,26 +259,6 @@ body {
 
 <script>
 window.addEventListener("load", function () {
-
-  const container = document.getElementById("valor-container");
-  const valor = document.getElementById("valor-texto");
-
-  if (container && valor) {
-    let fontSize = 270;
-    const minFontSize = 90;
-
-    valor.style.fontSize = fontSize + "px";
-    valor.style.whiteSpace = "nowrap";
-
-    while (
-      (valor.scrollWidth > container.clientWidth ||
-       valor.scrollHeight > container.clientHeight) &&
-      fontSize > minFontSize
-    ) {
-      fontSize -= 2;
-      valor.style.fontSize = fontSize + "px";
-    }
-  }
 
   const segmento = document.getElementById("segmento-bloco");
 

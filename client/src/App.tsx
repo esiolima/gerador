@@ -1,44 +1,55 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import CardGenerator from "./pages/CardGenerator";
 import LogoManager from "./pages/LogoManager";
-
-// 🔐 IMPORTANTE (NOVO)
-import { AuthProvider } from "@/auth/useAuth";
+import NotFound from "./pages/NotFound";
+import { AuthProvider, useAuth } from "@/auth/useAuth";
 import AuthGuard from "@/auth/AuthGuard";
 
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/generator"} component={CardGenerator} />
-      <Route path={"/logos"} component={LogoManager} />
-      <Route path={"/404"} component={NotFound} />
+      <Route path="/" component={Home} />
+      <Route path="/generator" component={CardGenerator} />
+      <Route path="/logos" component={LogoManager} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+function HeaderUser() {
+  const { user, logout } = useAuth();
+
+  if (!user) return null;
+
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AuthGuard>
-          <ThemeProvider defaultTheme="light">
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
-          </ThemeProvider>
-        </AuthGuard>
-      </AuthProvider>
-    </ErrorBoundary>
+    <div className="fixed top-4 right-4 bg-black/60 px-3 py-2 rounded text-white text-sm">
+      {user.email} |{" "}
+      <button onClick={logout} className="text-red-400">Sair</button>
+    </div>
   );
 }
 
-export default App;
+function AppContent() {
+  return (
+    <>
+      <HeaderUser />
+      <TooltipProvider>
+        <Toaster />
+        <Router />
+      </TooltipProvider>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthGuard>
+        <AppContent />
+      </AuthGuard>
+    </AuthProvider>
+  );
+}

@@ -23,10 +23,6 @@ type ProgressData = {
   processed: number;
   percentage: number;
   currentCard: string;
-  stage?: string;
-  detail?: string;
-  currentIndex?: number;
-  updatedAt?: string;
 };
 
 type GeneratedCard = {
@@ -313,12 +309,7 @@ export default function CardGenerator() {
   );
 
   const [isGeneratingJournal, setIsGeneratingJournal] = useState(false);
-  const [journalProgress, setJournalProgress] = useState({
-    step: 0,
-    message: "",
-    detail: "",
-    elapsedSeconds: 0,
-  });
+  const [journalProgress, setJournalProgress] = useState({ step: 0, message: "" });
   const [journalError, setJournalError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
@@ -453,42 +444,22 @@ export default function CardGenerator() {
 
     setIsGeneratingJournal(true);
     setJournalError(null);
-    setJournalProgress({
-      step: 5,
-      message: "Iniciando geração do jornal...",
-      detail: "Preparando o editor visual para exportação.",
-      elapsedSeconds: 0,
-    });
-
-    let progressTimer: ReturnType<typeof window.setInterval> | null = null;
-    let timeoutTimer: ReturnType<typeof window.setTimeout> | null = null;
+    setJournalProgress({ step: 5, message: "Iniciando geração do jornal diagramado..." });
 
     const controller = new AbortController();
-    const startedAt = Date.now();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, 180000);
 
-    const updateJournalProgress = (step: number, message: string, detail: string) => {
-      setJournalProgress({
-        step,
-        message,
-        detail,
-        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
-      });
-    };
+    let fakeProgressTimer: number | null = null;
 
     try {
-      updateJournalProgress(
-        10,
-        "Capturando páginas do jornal...",
-        "Lendo capa, página de cards, anúncio, imagens trocadas e textos editáveis."
-      );
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
 
+      setJournalProgress({ step: 15, message: "Capturando as páginas do editor visual..." });
       const serializedJournal = serializeJournalForPdf(journalRef.current);
 
-      updateJournalProgress(
-        25,
-        "Montando HTML final...",
-        "Preparando o arquivo completo que será enviado ao servidor."
-      );
+      setJournalProgress({ step: 30, message: "Montando HTML final do jornal..." });
 
       const journalHtml = `<!doctype html>
 <html>
@@ -501,41 +472,39 @@ export default function CardGenerator() {
 </body>
 </html>`;
 
-      updateJournalProgress(
-        40,
-        "Enviando jornal para o servidor...",
-        "O servidor vai abrir o Chromium e transformar as páginas em PDF."
-      );
+      setJournalProgress({ step: 45, message: "Enviando jornal para o servidor..." });
 
-      timeoutTimer = window.setTimeout(() => {
-        controller.abort();
-      }, 240000);
+      fakeProgressTimer = window.setInterval(() => {
+        setJournalProgress((current) => {
+          if (current.step >= 92) {
+            return {
+              step: current.step,
+              message: "Servidor ainda finalizando o PDF. Aguarde...",
+            };
+          }
 
-      const serverMessages = [
-        "Renderizando páginas no Chromium...",
-        "Ajustando dimensões das páginas...",
-        "Processando imagens e fontes...",
-        "Gerando páginas do PDF...",
-        "Finalizando arquivo do jornal...",
-      ];
+          const nextStep = Math.min(current.step + 3, 92);
 
-      progressTimer = window.setInterval(() => {
-        setJournalProgress((previous) => {
-          const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-          const nextStep = Math.min(previous.step + 1, 95);
-          const messageIndex = Math.min(
-            Math.floor(Math.max(nextStep - 45, 0) / 10),
-            serverMessages.length - 1
-          );
+          let message = "Renderizando páginas no servidor...";
+
+          if (nextStep >= 60) {
+            message = "Convertendo páginas em PDF...";
+          }
+
+          if (nextStep >= 75) {
+            message = "Aplicando imagens, cards e layout final...";
+          }
+
+          if (nextStep >= 88) {
+            message = "Finalizando arquivo para download...";
+          }
 
           return {
             step: nextStep,
-            message: serverMessages[messageIndex],
-            detail: `Ainda trabalhando. Tempo decorrido: ${elapsedSeconds}s.`,
-            elapsedSeconds,
+            message,
           };
         });
-      }, 1200);
+      }, 2500);
 
       const response = await fetch("/api/journal/pdf", {
         method: "POST",
@@ -548,61 +517,46 @@ export default function CardGenerator() {
         signal: controller.signal,
       });
 
-      if (progressTimer) window.clearInterval(progressTimer);
-      if (timeoutTimer) window.clearTimeout(timeoutTimer);
-
-      updateJournalProgress(
-        96,
-        "Recebendo resposta do servidor...",
-        "Validando o PDF gerado antes do download."
-      );
-
-      const responseText = await response.text();
-      let json: any = {};
-
-      try {
-        json = responseText ? JSON.parse(responseText) : {};
-      } catch {
-        throw new Error(
-          `O servidor respondeu com um conteúdo inválido. Resposta: ${responseText.slice(0, 180)}`
-        );
+      if (fakeProgressTimer) {
+        window.clearInterval(fakeProgressTimer);
+        fakeProgressTimer = null;
       }
+
+      setJournalProgress({ step: 96, message: "Recebendo resposta do servidor..." });
+
+      const json = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(json.error || json.message || "Erro ao gerar PDF do jornal.");
+        throw new Error(json?.error || "Erro ao gerar PDF do jornal.");
       }
 
-      updateJournalProgress(
-        100,
-        "Concluído! Iniciando download...",
-        "PDF do jornal gerado com sucesso."
-      );
+      if (!json?.pdfUrl) {
+        throw new Error("PDF gerado, mas o servidor não retornou o link de download.");
+      }
+
+      setJournalProgress({ step: 100, message: "Concluído! Iniciando download..." });
 
       window.setTimeout(() => {
         window.location.href = json.pdfUrl;
         setIsGeneratingJournal(false);
-      }, 700);
+      }, 900);
     } catch (err) {
-      if (progressTimer) window.clearInterval(progressTimer);
-      if (timeoutTimer) window.clearTimeout(timeoutTimer);
+      if (fakeProgressTimer) {
+        window.clearInterval(fakeProgressTimer);
+      }
 
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "A geração do jornal demorou demais e foi interrompida. O servidor provavelmente travou ao gerar o PDF."
+          ? "A geração do PDF demorou demais e foi interrompida. Tente novamente com menos cards ou imagens mais leves."
           : err instanceof Error
             ? err.message
             : "Erro ao gerar PDF do jornal.";
 
       console.error("[generateJournalPdf]", err);
       setJournalError(message);
-      setJournalProgress({
-        step: 100,
-        message: "Erro ao gerar PDF",
-        detail: message,
-        elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
-      });
-      window.alert(message);
-      setIsGeneratingJournal(false);
+      setJournalProgress({ step: 100, message: "Falha ao gerar PDF do jornal." });
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   };
 
@@ -612,7 +566,6 @@ export default function CardGenerator() {
     setProgress(null);
     setShowJournal(false);
     setError(null);
-    setJournalError(null);
     setIsProcessing(false);
   };
 
@@ -729,22 +682,12 @@ export default function CardGenerator() {
                   <p className="text-white/45">
                     {progress.currentCard || `${progress.processed}/${progress.total}`}
                   </p>
-                  {progress.stage && (
-                    <p className="mt-1 text-xs font-bold uppercase tracking-wide text-blue-300">
-                      Etapa: {progress.stage.replaceAll("_", " ")}
-                    </p>
-                  )}
-                  {progress.detail && (
-                    <p className="mt-1 text-xs text-white/35">
-                      {progress.detail}
-                    </p>
-                  )}
                 </div>
 
                 <div className="h-3 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${Math.max(0, Math.min(progress.percentage, 100))}%` }}
+                    style={{ width: `${progress.percentage}%` }}
                   />
                 </div>
 
@@ -809,12 +752,6 @@ export default function CardGenerator() {
                   Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as
                   imagens.
                 </p>
-                {journalError && (
-                  <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
-                    <AlertCircle className="mr-2 inline h-4 w-4" />
-                    {journalError}
-                  </div>
-                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
@@ -947,35 +884,68 @@ export default function CardGenerator() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
             <div className="mb-6 flex flex-col items-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                <FileText className="h-8 w-8 animate-pulse" />
+              <div
+                className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
+                  journalError ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                {journalError ? (
+                  <AlertCircle className="h-8 w-8" />
+                ) : (
+                  <FileText className="h-8 w-8 animate-pulse" />
+                )}
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Gerando Jornal PDF</h3>
+
+              <h3 className="text-xl font-bold text-gray-900">
+                {journalError ? "Erro ao gerar o jornal" : "Gerando Jornal PDF"}
+              </h3>
+
               <p className="mt-2 text-sm text-gray-500">
-                Acompanhe a etapa atual abaixo. Se houver erro, a mensagem aparecerá na tela.
+                {journalError
+                  ? "A geração foi interrompida. Veja a mensagem abaixo."
+                  : "Acompanhe cada etapa da geração do PDF diagramado."}
               </p>
             </div>
 
             <div className="space-y-4">
               <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
-                <div 
-                  className="h-full bg-blue-600 transition-all duration-500 ease-out"
+                <div
+                  className={`h-full transition-all duration-500 ease-out ${
+                    journalError ? "bg-red-600" : "bg-blue-600"
+                  }`}
                   style={{ width: `${journalProgress.step}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-blue-600">{journalProgress.message}</span>
-                <span className="text-gray-400">{journalProgress.step}%</span>
+
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span
+                  className={`font-medium ${
+                    journalError ? "text-red-600" : "text-blue-600"
+                  }`}
+                >
+                  {journalError || journalProgress.message}
+                </span>
+                <span className="shrink-0 text-gray-400">{journalProgress.step}%</span>
               </div>
-              {journalProgress.detail && (
-                <p className="text-center text-xs leading-relaxed text-gray-500">
-                  {journalProgress.detail}
-                </p>
+
+              {!journalError && (
+                <div className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500">
+                  Se a mensagem continuar mudando, a ferramenta ainda está trabalhando.
+                  Se aparecer erro aqui, o problema será exibido sem travar a tela.
+                </div>
               )}
-              {journalProgress.elapsedSeconds > 0 && (
-                <p className="text-center text-xs text-gray-400">
-                  Tempo decorrido: {journalProgress.elapsedSeconds}s
-                </p>
+
+              {journalError && (
+                <Button
+                  onClick={() => {
+                    setIsGeneratingJournal(false);
+                    setJournalError(null);
+                    setJournalProgress({ step: 0, message: "" });
+                  }}
+                  className="h-11 w-full rounded-xl bg-red-600 text-white hover:bg-red-700"
+                >
+                  Fechar
+                </Button>
               )}
             </div>
           </div>

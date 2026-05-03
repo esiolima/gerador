@@ -68,7 +68,8 @@ body {
   display: block;
 }
 
-.selo img[src=""] {
+.selo img[src=""],
+.selo img:not([src]) {
   display: none;
 }
 
@@ -87,22 +88,11 @@ body {
   max-height: 114px;
   max-width: 336px;
   object-fit: contain;
+  display: block;
 }
 
-.logo img[src=""] {
-  display: none;
-}
-
-.logo:has(img[src=""])::before,
-.logo:has(img[src=""]),
-.logo:not(:has(img)) {
-  background: #f5f5f5;
-  border-radius: 16px;
-}
-
-.logo:has(img[src=""])::before,
-.logo:not(:has(img))::before {
-  content: "";
+.logo img[src=""],
+.logo img:not([src]) {
   display: none;
 }
 
@@ -129,13 +119,16 @@ body {
   margin-top: 10px;
 }
 
-.numero, .percent {
+.numero,
+.percent {
   font-weight: 900;
   font-size: clamp(120px, 25vw, 270px);
   line-height: 0.85;
 }
 
-.percent { margin-left: 6px; }
+.percent {
+  margin-left: 6px;
+}
 
 .desconto {
   margin-top: 5px;
@@ -165,7 +158,7 @@ body {
   opacity: 0.8;
 }
 
-/* ===== CUPOM BOX AJUSTADO ===== */
+/* ===== CUPOM BOX ===== */
 .cupom-box {
   margin-top: 10px;
   margin-bottom: 20px;
@@ -286,41 +279,59 @@ body {
 </div>
 
 <script>
-(function () {
-  const el = document.getElementById("cupom-text");
+window.addEventListener("load", function () {
+  try {
+    const el = document.getElementById("cupom-text");
 
-  if (el) {
-    const container = el.parentElement;
-    let fontSize = 72;
-    const min = 20;
+    if (el && el.parentElement) {
+      const container = el.parentElement;
+      let fontSize = 72;
+      const min = 20;
+      let tentativas = 0;
+      const maxTentativas = 80;
 
-    el.style.fontSize = fontSize + "px";
-    el.style.whiteSpace = "nowrap";
-
-    const getAvailableWidth = function () {
-      const styles = window.getComputedStyle(container);
-      const paddingLeft = parseFloat(styles.paddingLeft) || 0;
-      const paddingRight = parseFloat(styles.paddingRight) || 0;
-
-      return container.clientWidth - paddingLeft - paddingRight;
-    };
-
-    while (el.scrollWidth > getAvailableWidth() && fontSize > min) {
-      fontSize--;
       el.style.fontSize = fontSize + "px";
+      el.style.whiteSpace = "nowrap";
+
+      function getAvailableWidth() {
+        const styles = window.getComputedStyle(container);
+        const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+        const paddingRight = parseFloat(styles.paddingRight) || 0;
+        const width = container.clientWidth - paddingLeft - paddingRight;
+
+        return Math.max(width, 50);
+      }
+
+      const availableWidth = getAvailableWidth();
+
+      while (
+        el.scrollWidth > availableWidth &&
+        fontSize > min &&
+        tentativas < maxTentativas
+      ) {
+        fontSize -= 1;
+        el.style.fontSize = fontSize + "px";
+        tentativas += 1;
+      }
     }
-  }
 
-  const segmento = document.getElementById("segmento-bloco");
+    const segmento = document.getElementById("segmento-bloco");
 
-  if (segmento) {
-    const texto = segmento.textContent?.trim() || "";
+    if (segmento) {
+      const texto = (segmento.textContent || "").trim();
 
-    if (!texto || texto === "NEGÓCIO DE CLIENTES:" || texto.includes("{{SEGMENTO}}")) {
-      segmento.style.display = "none";
+      if (
+        !texto ||
+        texto === "NEGÓCIO DE CLIENTES:" ||
+        texto.includes("{{SEGMENTO}}")
+      ) {
+        segmento.style.display = "none";
+      }
     }
+  } catch (error) {
+    console.error("[cupom.html] erro no ajuste visual:", error);
   }
-})();
+});
 </script>
 
 </body>

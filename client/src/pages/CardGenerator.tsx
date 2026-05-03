@@ -815,7 +815,7 @@ export default function CardGenerator() {
             </div>
 
             <h1 className="text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
-              Sua planilha virou{" "}
+              Sua planilha vira{" "}
               <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
                 argumento de venda
               </span>{" "}

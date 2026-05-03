@@ -129,13 +129,14 @@ body {
   align-items: flex-end;
   justify-content: center;
   width: 100%;
+  max-width: 500px; /* 🔥 LIMITADOR PARA IGUALAR COM OS OUTROS */
   margin-top: 10px;
 }
 
 .numero,
 .percent {
   font-weight: 900;
-  font-size: clamp(120px, 25vw, 270px);
+  font-size: clamp(120px, 22vw, 240px); /* 🔥 AJUSTADO */
   line-height: 0.85;
 }
 
@@ -304,31 +305,12 @@ window.addEventListener("load", function () {
       const container = el.parentElement;
       let fontSize = 72;
       const min = 20;
-      let tentativas = 0;
-      const maxTentativas = 80;
 
       el.style.fontSize = fontSize + "px";
-      el.style.whiteSpace = "nowrap";
 
-      function getAvailableWidth() {
-        const styles = window.getComputedStyle(container);
-        const paddingLeft = parseFloat(styles.paddingLeft) || 0;
-        const paddingRight = parseFloat(styles.paddingRight) || 0;
-        const width = container.clientWidth - paddingLeft - paddingRight;
-
-        return Math.max(width, 50);
-      }
-
-      const availableWidth = getAvailableWidth();
-
-      while (
-        el.scrollWidth > availableWidth &&
-        fontSize > min &&
-        tentativas < maxTentativas
-      ) {
+      while (el.scrollWidth > container.clientWidth && fontSize > min) {
         fontSize -= 1;
         el.style.fontSize = fontSize + "px";
-        tentativas += 1;
       }
     }
 
@@ -346,7 +328,7 @@ window.addEventListener("load", function () {
       }
     }
   } catch (error) {
-    console.error("[cupom.html] erro no ajuste visual:", error);
+    console.error("[cupom.html] erro:", error);
   }
 });
 </script>

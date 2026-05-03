@@ -188,6 +188,7 @@ export function setupJournalRoute(app: Express) {
         success: true,
         pdfPath,
         pdfUrl: `/output/${jobId}/${pdfName}`,
+        downloadUrl: `/api/journal/download?pdfPath=${encodeURIComponent(pdfPath)}`,
         fileName: pdfName,
       });
     } catch (error) {
@@ -206,4 +207,55 @@ export function setupJournalRoute(app: Express) {
       }
     }
   });
+
+  app.get("/api/journal/download", async (req: Request, res: Response) => {
+    try {
+      const pdfPath = String(req.query?.pdfPath || "");
+
+      if (!pdfPath) {
+        return res.status(400).json({
+          success: false,
+          error: "Caminho do PDF não informado.",
+        });
+      }
+
+      const resolvedPath = path.resolve(pdfPath);
+      const resolvedOutputDir = path.resolve(OUTPUT_DIR);
+
+      if (!resolvedPath.startsWith(resolvedOutputDir)) {
+        return res.status(403).json({
+          success: false,
+          error: "Acesso negado ao arquivo solicitado.",
+        });
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
+        return res.status(404).json({
+          success: false,
+          error: "PDF não encontrado.",
+        });
+      }
+
+      const fileName = path.basename(resolvedPath);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${fileName}"`
+      );
+
+      return res.download(resolvedPath, fileName);
+    } catch (error) {
+      console.error("[JournalHandler] Erro ao baixar PDF do jornal:", error);
+
+      return res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Erro ao baixar PDF do jornal diagramado.",
+      });
+    }
+  });
+
 }

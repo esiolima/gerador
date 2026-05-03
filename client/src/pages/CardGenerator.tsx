@@ -815,16 +815,15 @@ export default function CardGenerator() {
             </div>
 
             <h1 className="text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
-              Planilhas viram{" "}
+              Sua planilha virou{" "}
               <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
-                campanhas
+                argumento de venda
               </span>{" "}
               prontas.
             </h1>
 
             <p className="max-w-2xl text-lg text-white/55">
-              Envie o Excel, gere cards em PDF, baixe o ZIP e monte um jornal de ofertas
-              editável com capa, categorias, grid automático e exportação final em PDF.
+              Gere um jornal de ofertas profissional de trade, pensado para a força de vendas B2B com categorias organizadas, ofertas claras e layout pronto para negociação.
             </p>
           </div>
 

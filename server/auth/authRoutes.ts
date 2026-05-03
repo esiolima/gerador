@@ -12,21 +12,18 @@ import {
 } from "./authService";
 import { authMiddleware, requireAdmin } from "./authMiddleware";
 import { AuthenticatedRequest } from "./authTypes";
+import nodemailer from "nodemailer";
 
 function getTokenFromCookie(req: Request) {
   const cookieHeader = req.headers.cookie || "";
   const cookieName = getAuthCookieName();
 
-  const cookies = cookieHeader
-    .split(";")
-    .map((cookie) => cookie.trim())
-    .filter(Boolean);
+  const cookies = cookieHeader.split(";").map((c) => c.trim());
 
   for (const cookie of cookies) {
-    const [key, ...valueParts] = cookie.split("=");
-
+    const [key, ...value] = cookie.split("=");
     if (key === cookieName) {
-      return decodeURIComponent(valueParts.join("="));
+      return decodeURIComponent(value.join("="));
     }
   }
 
@@ -36,134 +33,63 @@ function getTokenFromCookie(req: Request) {
 export async function setupAuthRoutes(app: Express) {
   await ensureInitialAdminUser();
 
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  app.post("/api/auth/login", async (req, res) => {
     try {
-      const email = String(req.body?.email || "");
-      const password = String(req.body?.password || "");
-
-      const result = await loginWithEmailPassword(email, password);
-
+      const result = await loginWithEmailPassword(req.body.email, req.body.password);
       res.cookie(getAuthCookieName(), result.token, getCookieOptions());
-
-      return res.json({
-        success: true,
-        user: result.user,
-      });
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Não foi possível fazer login.",
-      });
+      res.json({ success: true, user: result.user });
+    } catch (e: any) {
+      res.status(401).json({ success: false, error: e.message });
     }
   });
 
-  app.post("/api/auth/logout", (_req: Request, res: Response) => {
-    res.clearCookie(getAuthCookieName(), {
-      path: "/",
-    });
-
-    return res.json({
-      success: true,
-    });
+  app.post("/api/auth/logout", (_req, res) => {
+    res.clearCookie(getAuthCookieName(), { path: "/" });
+    res.json({ success: true });
   });
 
-  app.get("/api/auth/me", (req: Request, res: Response) => {
+  app.get("/api/auth/me", (req, res) => {
     try {
       const token = getTokenFromCookie(req);
-
-      if (!token) {
-        return res.status(401).json({
-          success: false,
-          error: "Usuário não autenticado.",
-        });
-      }
-
       const payload = verifyAuthToken(token);
       const user = getUserById(payload.id);
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          error: "Usuário não encontrado.",
-        });
-      }
-
-      return res.json({
-        success: true,
-        user,
-      });
+      res.json({ success: true, user });
     } catch {
-      return res.status(401).json({
-        success: false,
-        error: "Sessão inválida.",
-      });
+      res.status(401).json({ success: false });
     }
   });
 
-  app.get(
-    "/api/auth/users",
-    authMiddleware,
-    requireAdmin,
-    (_req: AuthenticatedRequest, res: Response) => {
-      return res.json({
-        success: true,
-        users: listUsers(),
+  // 🔥 NOVO — SOLICITAÇÃO DE ACESSO
+  app.post("/api/auth/request-access", async (req: Request, res: Response) => {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
       });
+
+      await transporter.sendMail({
+        from: `"Ofertas Trade" <${process.env.SMTP_USER}>`,
+        to: "esio.filho@martins.com.br",
+        subject: "Novo pedido de acesso",
+        html: `
+          <h2>Novo pedido</h2>
+          <p><b>Nome:</b> ${req.body.name}</p>
+          <p><b>Email:</b> ${req.body.email}</p>
+          <p><b>Empresa:</b> ${req.body.company}</p>
+          <p><b>Cargo:</b> ${req.body.role}</p>
+          <p><b>Telefone:</b> ${req.body.phone}</p>
+          <p><b>Mensagem:</b> ${req.body.message}</p>
+        `,
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, error: "Erro ao enviar email" });
     }
-  );
-
-  app.post(
-    "/api/auth/users",
-    authMiddleware,
-    requireAdmin,
-    async (req: AuthenticatedRequest, res: Response) => {
-      try {
-        const user = await createUser({
-          name: String(req.body?.name || ""),
-          email: String(req.body?.email || ""),
-          password: String(req.body?.password || ""),
-          role: req.body?.role === "admin" ? "admin" : "user",
-        });
-
-        return res.json({
-          success: true,
-          user,
-        });
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Erro ao criar usuário.",
-        });
-      }
-    }
-  );
-
-  app.delete(
-    "/api/auth/users/:id",
-    authMiddleware,
-    requireAdmin,
-    (req: AuthenticatedRequest, res: Response) => {
-      try {
-        deactivateUser(req.params.id);
-
-        return res.json({
-          success: true,
-        });
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Erro ao remover usuário.",
-        });
-      }
-    }
-  );
+  });
 }

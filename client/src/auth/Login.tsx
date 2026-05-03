@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./useAuth";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Login() {
   const { login } = useAuth();
@@ -9,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showRequest, setShowRequest] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [loading, setLoading] = useState(false);
 
   const fields = [
     { key: "name", label: "nome" },
@@ -49,71 +51,91 @@ export default function Login() {
         </div>
       </div>
 
-      {/* MODAL */}
-      {showRequest && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center"
-          onClick={() => setShowRequest(false)}
-        >
-          <div
-            className="bg-[#06111f] p-6 rounded-xl w-full max-w-md space-y-3"
-            onClick={(e) => e.stopPropagation()}
+      {/* MODAL COM ANIMAÇÃO */}
+      <AnimatePresence>
+        {showRequest && (
+          <motion.div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center"
+            onClick={() => setShowRequest(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            {/* BOTÃO VOLTAR */}
-            <button
-              onClick={() => setShowRequest(false)}
-              className="text-sm text-gray-400 hover:text-white"
+            <motion.div
+              className="bg-[#06111f] p-6 rounded-xl w-full max-w-md space-y-3"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
             >
-              ← Voltar
-            </button>
+              {/* VOLTAR */}
+              <button
+                onClick={() => setShowRequest(false)}
+                className="text-sm text-gray-400 hover:text-white"
+              >
+                ← Voltar
+              </button>
 
-            <h2 className="text-lg font-semibold">Solicitar acesso</h2>
+              <h2 className="text-lg font-semibold">Solicitar acesso</h2>
 
-            {fields.map((f) => (
-              <input
-                key={f.key}
-                placeholder={f.label}
+              {fields.map((f) => (
+                <input
+                  key={f.key}
+                  placeholder={f.label}
+                  className="w-full p-2 bg-black/30 rounded"
+                  onChange={(e) =>
+                    setForm({ ...form, [f.key]: e.target.value })
+                  }
+                />
+              ))}
+
+              <textarea
+                placeholder="mensagem"
                 className="w-full p-2 bg-black/30 rounded"
                 onChange={(e) =>
-                  setForm({ ...form, [f.key]: e.target.value })
+                  setForm({ ...form, message: e.target.value })
                 }
               />
-            ))}
 
-            <textarea
-              placeholder="mensagem"
-              className="w-full p-2 bg-black/30 rounded"
-              onChange={(e) =>
-                setForm({ ...form, message: e.target.value })
-              }
-            />
+              {/* BOTÕES */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRequest(false)}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
 
-            {/* BOTÕES */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setShowRequest(false)}
-              >
-                Cancelar
-              </Button>
+                <Button
+                  disabled={loading}
+                  onClick={async () => {
+                    setLoading(true);
 
-              <Button
-                onClick={async () => {
-                  await fetch("/api/auth/request-access", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(form),
-                  });
-                  alert("Enviado!");
-                  setShowRequest(false);
-                }}
-              >
-                Enviar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                    try {
+                      await fetch("/api/auth/request-access", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(form),
+                      });
+
+                      alert("Enviado!");
+                      setShowRequest(false);
+                    } catch (e) {
+                      alert("Erro ao enviar");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  {loading ? "Enviando..." : "Enviar"}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

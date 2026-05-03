@@ -56,10 +56,23 @@ export const cardRouter = router({
           processedRows: result.processedRows,
         };
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro ao processar cards";
+
+        ctx.io?.to(sessionId).emit("progress", {
+          processed: 0,
+          total: 0,
+          percentage: 100,
+          currentCard: "Erro ao processar cards",
+          stage: "erro",
+          detail: message,
+          updatedAt: new Date().toISOString(),
+        });
+
+        ctx.io?.to(sessionId).emit("error", message);
+
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message:
-            error instanceof Error ? error.message : "Erro ao processar cards",
+          message,
         });
       } finally {
         await generator.close().catch(() => {});

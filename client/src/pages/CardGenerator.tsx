@@ -887,72 +887,80 @@ export default function CardGenerator() {
                     </div>
                   </div>
 
-                  {journalCardPages.map((journalPage, pageIndex) => (
-                    <div
-                      key={`${journalPage.category}-${journalPage.pageIndexWithinCategory}`}
-                    >
-                      <div className="journal-page-label">
-                        Página {pageIndex + 2} — {journalPage.category}
-                        {journalPage.isContinuation ? " — continuação" : ""}
-                      </div>
+                  {journalCardPages.map((journalPage, pageIndex) => {
+                    const nextPage = journalCardPages[pageIndex + 1];
+                    const isLastPageOfCategory =
+                      !nextPage || nextPage.category !== journalPage.category;
 
-                      <section
-                        className={`journal-category-page ${
-                          journalPage.isContinuation ? "is-continuation" : ""
-                        }`}
-                        data-journal-page="category"
-                        data-journal-title={
-                          journalPage.isContinuation
-                            ? `${journalPage.category} - continuação ${journalPage.pageIndexWithinCategory + 1}`
-                            : journalPage.category
-                        }
-                        style={{ background: pageBackground }}
+                    return (
+                      <div
+                        key={`${journalPage.category}-${journalPage.pageIndexWithinCategory}`}
                       >
-                        {!journalPage.isContinuation && (
-                          <>
-                            <div
-                              className="journal-header"
-                              onClick={() => headerInputRef.current?.click()}
-                            >
-                              <img src={headerImage} alt="Cabeçalho do jornal" />
-                              <span>Cabeçalho</span>
-                            </div>
-
-                            <div className="journal-category-bar">
-                              {journalPage.category}
-                            </div>
-                          </>
-                        )}
-
-                        <div className="journal-grid">
-                          {journalPage.cards.map((card, index) => (
-                            <div
-                              className="journal-card-wrap"
-                              key={`${card.ordem}-${card.tipo}-${index}`}
-                            >
-                              <ShadowCard
-                                html={card.html}
-                                cardKey={`${card.ordem}-${card.tipo}-${index}`}
-                              />
-                            </div>
-                          ))}
+                        <div className="journal-page-label">
+                          Página {pageIndex + 2} — {journalPage.category}
+                          {journalPage.isContinuation ? " — continuação" : ""}
                         </div>
 
-                        <div
-                          className="journal-footer-text"
-                          style={{
-                            color: footerTextColor,
-                            borderTopColor: footerBorderColor,
-                          }}
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={(event) => setFooterText(event.currentTarget.innerText)}
+                        <section
+                          className={`journal-category-page ${
+                            journalPage.isContinuation ? "is-continuation" : ""
+                          } ${isLastPageOfCategory ? "is-last-category-page" : ""}`}
+                          data-journal-page="category"
+                          data-journal-title={
+                            journalPage.isContinuation
+                              ? `${journalPage.category} - continuação ${journalPage.pageIndexWithinCategory + 1}`
+                              : journalPage.category
+                          }
+                          style={{ background: pageBackground }}
                         >
-                          {footerText}
-                        </div>
-                      </section>
-                    </div>
-                  ))}
+                          {!journalPage.isContinuation && (
+                            <>
+                              <div
+                                className="journal-header"
+                                onClick={() => headerInputRef.current?.click()}
+                              >
+                                <img src={headerImage} alt="Cabeçalho do jornal" />
+                                <span>Cabeçalho</span>
+                              </div>
+
+                              <div className="journal-category-bar">
+                                {journalPage.category}
+                              </div>
+                            </>
+                          )}
+
+                          <div className="journal-grid">
+                            {journalPage.cards.map((card, index) => (
+                              <div
+                                className="journal-card-wrap"
+                                key={`${card.ordem}-${card.tipo}-${index}`}
+                              >
+                                <ShadowCard
+                                  html={card.html}
+                                  cardKey={`${card.ordem}-${card.tipo}-${index}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {isLastPageOfCategory && (
+                            <div
+                              className="journal-footer-text"
+                              style={{
+                                color: footerTextColor,
+                                borderTopColor: footerBorderColor,
+                              }}
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(event) => setFooterText(event.currentTarget.innerText)}
+                            >
+                              {footerText}
+                            </div>
+                          )}
+                        </section>
+                      </div>
+                    );
+                  })}
 
                   <div className="journal-page-label">
                     Página {journalCardPages.length + 2} — Anúncio
@@ -1038,7 +1046,7 @@ export default function CardGenerator() {
                   ? "A geração foi interrompida. Veja a mensagem abaixo."
                   : journalDownloadUrl
                     ? "Clique no botão abaixo para baixar o arquivo PDF."
-                    : "A ferramenta vai gerar capa, páginas de cards sem cortes e anúncio final."}
+                    : "A ferramenta vai gerar capa, páginas de cards com altura ajustada e anúncio final."}
               </p>
             </div>
 
@@ -1073,7 +1081,7 @@ export default function CardGenerator() {
 
               {!journalError && !journalDownloadUrl && (
                 <div className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500">
-                  O PDF final será montado com páginas 1080x1920: capa, páginas de cards sem cortes e anúncio.
+                  O PDF final será montado com páginas de até 1080x1920, sem sobras artificiais e com rodapé apenas no fim de cada categoria.
                 </div>
               )}
 
@@ -1237,9 +1245,10 @@ const journalCss = `
   .journal-category-page{
     position:relative;
     width:1080px;
-    height:1920px;
-    min-height:1920px;
-    padding-bottom:118px;
+    height:auto;
+    min-height:0;
+    max-height:1920px;
+    padding-bottom:40px;
     background:#ffffff;
     box-shadow:0 20px 50px rgba(0,0,0,.08);
     margin-bottom:40px;
@@ -1330,11 +1339,11 @@ const journalCss = `
   }
 
   .journal-footer-text{
-    position:absolute;
-    left:54px;
-    right:54px;
-    bottom:34px;
-    margin:0;
+    position:relative;
+    left:auto;
+    right:auto;
+    bottom:auto;
+    margin:12px 54px 0 54px;
     padding:18px 24px 0 24px;
     border-top:2px solid rgba(0,0,0,.16);
     text-align:center;

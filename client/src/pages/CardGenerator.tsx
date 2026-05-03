@@ -42,6 +42,12 @@ type ProcessResult = {
   processedRows: number;
 };
 
+type JournalPagePayload = {
+  type: "cover" | "category" | "ad";
+  title: string;
+  html: string;
+};
+
 function readImageAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -228,11 +234,11 @@ function ShadowCard({
   );
 }
 
-function serializeJournalForPdf(journalElement: HTMLDivElement) {
-  const clone = journalElement.cloneNode(true) as HTMLDivElement;
+function serializeElementForPdf(element: HTMLElement) {
+  const clone = element.cloneNode(true) as HTMLElement;
 
   const originalHosts = Array.from(
-    journalElement.querySelectorAll(".journal-card-shadow-host")
+    element.querySelectorAll(".journal-card-shadow-host")
   ) as HTMLDivElement[];
 
   const clonedHosts = Array.from(
@@ -243,7 +249,6 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
     const originalHost = originalHosts[index];
     const shadowHtml = originalHost?.shadowRoot?.innerHTML || "";
 
-    // Usando template para compatibilidade máxima durante a serialização
     clonedHost.innerHTML = `
       <template shadowrootmode="open">
         ${shadowHtml}
@@ -253,18 +258,15 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
 
   const activateDeclarativeShadowDom = `
     <script>
-      // Método moderno e seguro para ativar Shadow DOM Declarativo
       document.querySelectorAll("template[shadowrootmode]").forEach(function(template) {
         var mode = template.getAttribute("shadowrootmode") || "open";
         var parent = template.parentNode;
         if (!parent || parent.shadowRoot) return;
-        
+
         try {
-          // Tenta usar o método moderno se disponível
-          if (typeof parent.setHTMLUnsafe === 'function') {
+          if (typeof parent.setHTMLUnsafe === "function") {
             parent.setHTMLUnsafe(template.innerHTML);
           } else {
-            // Fallback para navegadores que ainda não suportam setHTMLUnsafe
             var shadow = parent.attachShadow({ mode: mode });
             shadow.appendChild(template.content.cloneNode(true));
             template.remove();
@@ -277,6 +279,26 @@ function serializeJournalForPdf(journalElement: HTMLDivElement) {
   `;
 
   return `${clone.outerHTML}${activateDeclarativeShadowDom}`;
+}
+
+function buildJournalPagesForPdf(journalElement: HTMLDivElement): JournalPagePayload[] {
+  const pageElements = Array.from(
+    journalElement.querySelectorAll("[data-journal-page]")
+  ) as HTMLElement[];
+
+  return pageElements.map((pageElement, index) => {
+    const rawType = pageElement.getAttribute("data-journal-page") || "category";
+    const type = rawType === "cover" || rawType === "ad" ? rawType : "category";
+    const title =
+      pageElement.getAttribute("data-journal-title") ||
+      (type === "cover" ? "Capa" : type === "ad" ? "Anúncio" : `Categoria ${index}`);
+
+    return {
+      type,
+      title,
+      html: serializeElementForPdf(pageElement),
+    };
+  });
 }
 
 const PAGE_BACKGROUND_STORAGE_KEY = "jornal_page_background";
@@ -453,50 +475,44 @@ export default function CardGenerator() {
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => {
       controller.abort();
-    }, 180000);
+    }, 240000);
 
     let fakeProgressTimer: number | null = null;
 
     try {
       await new Promise((resolve) => window.setTimeout(resolve, 150));
 
-      setJournalProgress({ step: 15, message: "Capturando as páginas do editor visual..." });
-      const serializedJournal = serializeJournalForPdf(journalRef.current);
+      setJournalProgress({ step: 15, message: "Separando capa, categorias e anúncio..." });
+      const pages = buildJournalPagesForPdf(journalRef.current);
 
-      setJournalProgress({ step: 30, message: "Montando HTML final do jornal..." });
+      if (!pages.length) {
+        throw new Error("Nenhuma página do jornal foi encontrada para gerar o PDF.");
+      }
 
-      const journalHtml = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <style>${journalCss}</style>
-</head>
-<body>
-  ${serializedJournal}
-</body>
-</html>`;
-
-      setJournalProgress({ step: 45, message: "Enviando jornal para o servidor..." });
+      setJournalProgress({
+        step: 30,
+        message: `Preparando ${pages.length} páginas independentes...`,
+      });
 
       fakeProgressTimer = window.setInterval(() => {
         setJournalProgress((current) => {
           if (current.step >= 92) {
             return {
               step: current.step,
-              message: "Servidor ainda finalizando o PDF. Aguarde...",
+              message: "Servidor ainda renderizando e juntando os PDFs. Aguarde...",
             };
           }
 
           const nextStep = Math.min(current.step + 3, 92);
 
-          let message = "Renderizando páginas no servidor...";
+          let message = "Renderizando capa, categorias e anúncio...";
 
-          if (nextStep >= 60) {
-            message = "Convertendo páginas em PDF...";
+          if (nextStep >= 55) {
+            message = "Gerando um PDF para cada página...";
           }
 
           if (nextStep >= 75) {
-            message = "Aplicando imagens, cards e layout final...";
+            message = "Juntando os PDFs em um único arquivo...";
           }
 
           if (nextStep >= 88) {
@@ -514,7 +530,7 @@ export default function CardGenerator() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          html: journalHtml,
+          pages,
           jobId: result?.jobId,
           fileName: result?.fileName,
         }),
@@ -534,11 +550,12 @@ export default function CardGenerator() {
         throw new Error(json?.error || "Erro ao gerar PDF do jornal.");
       }
 
-      if (!json?.pdfUrl) {
+      if (!json?.pdfPath && !json?.downloadUrl) {
         throw new Error("PDF gerado, mas o servidor não retornou o link de download.");
       }
 
-      const downloadUrl = json.downloadUrl || `/api/journal/download?pdfPath=${encodeURIComponent(json.pdfPath)}`;
+      const downloadUrl =
+        json.downloadUrl || `/api/journal/download?pdfPath=${encodeURIComponent(json.pdfPath)}`;
 
       setJournalDownloadUrl(downloadUrl);
       setJournalDownloadFileName(json.fileName || "jornal-diagramado.pdf");
@@ -550,7 +567,7 @@ export default function CardGenerator() {
 
       const message =
         err instanceof DOMException && err.name === "AbortError"
-          ? "A geração do PDF demorou demais e foi interrompida. Tente novamente com menos cards ou imagens mais leves."
+          ? "A geração do PDF demorou demais e foi interrompida. Tente novamente com imagens mais leves."
           : err instanceof Error
             ? err.message
             : "Erro ao gerar PDF do jornal.";
@@ -757,7 +774,7 @@ export default function CardGenerator() {
                 <h2 className="text-2xl font-black">Editor visual do jornal</h2>
                 <p className="text-sm text-white/45">
                   Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as
-                  imagens.
+                  imagens. Cada categoria será gerada como uma página independente.
                 </p>
               </div>
 
@@ -790,7 +807,9 @@ export default function CardGenerator() {
                   <div className="journal-page-label">Página 1 — Capa</div>
 
                   <div
-                    className="journal-page journal-cover"
+                    className="journal-page journal-cover-page"
+                    data-journal-page="cover"
+                    data-journal-title="Capa"
                     onClick={() => coverInputRef.current?.click()}
                   >
                     <img src={coverImage} alt="Capa do jornal" />
@@ -800,19 +819,26 @@ export default function CardGenerator() {
                     </div>
                   </div>
 
-                  <div className="journal-page-label">Página 2 — Cards</div>
+                  {groupedCards.map(([category, cards], categoryIndex) => (
+                    <div key={category}>
+                      <div className="journal-page-label">
+                        Página {categoryIndex + 2} — {category}
+                      </div>
 
-                  <div className="journal-flow-page" style={{ background: pageBackground }}>
-                    <div
-                      className="journal-header"
-                      onClick={() => headerInputRef.current?.click()}
-                    >
-                      <img src={headerImage} alt="Cabeçalho do jornal" />
-                      <span>Cabeçalho</span>
-                    </div>
+                      <section
+                        className="journal-category-page"
+                        data-journal-page="category"
+                        data-journal-title={category}
+                        style={{ background: pageBackground }}
+                      >
+                        <div
+                          className="journal-header"
+                          onClick={() => headerInputRef.current?.click()}
+                        >
+                          <img src={headerImage} alt="Cabeçalho do jornal" />
+                          <span>Cabeçalho</span>
+                        </div>
 
-                    {groupedCards.map(([category, cards]) => (
-                      <section className="journal-category" key={category}>
                         <div className="journal-category-bar">{category}</div>
 
                         <div className="journal-grid">
@@ -828,23 +854,27 @@ export default function CardGenerator() {
                             </div>
                           ))}
                         </div>
-                      </section>
-                    ))}
 
-                    <div
-                      className="journal-footer-text"
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(event) => setFooterText(event.currentTarget.innerText)}
-                    >
-                      {footerText}
+                        <div
+                          className="journal-footer-text"
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={(event) => setFooterText(event.currentTarget.innerText)}
+                        >
+                          {footerText}
+                        </div>
+                      </section>
                     </div>
+                  ))}
+
+                  <div className="journal-page-label">
+                    Página {groupedCards.length + 2} — Anúncio
                   </div>
 
-                  <div className="journal-page-label">Página 3 — Anúncio</div>
-
                   <div
-                    className="journal-page journal-cover"
+                    className="journal-page journal-ad-page"
+                    data-journal-page="ad"
+                    data-journal-title="Anúncio"
                     onClick={() => adInputRef.current?.click()}
                   >
                     <img src={adImage} alt="Anúncio do jornal" />
@@ -886,14 +916,17 @@ export default function CardGenerator() {
 
       <style>{journalCss}</style>
 
-      {/* Popup de Progresso do Jornal */}
       {isGeneratingJournal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
             <div className="mb-6 flex flex-col items-center text-center">
               <div
                 className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full ${
-                  journalError ? "bg-red-50 text-red-600" : journalDownloadUrl ? "bg-teal-50 text-teal-600" : "bg-blue-50 text-blue-600"
+                  journalError
+                    ? "bg-red-50 text-red-600"
+                    : journalDownloadUrl
+                      ? "bg-teal-50 text-teal-600"
+                      : "bg-blue-50 text-blue-600"
                 }`}
               >
                 {journalError ? (
@@ -906,7 +939,11 @@ export default function CardGenerator() {
               </div>
 
               <h3 className="text-xl font-bold text-gray-900">
-                {journalError ? "Erro ao gerar o jornal" : journalDownloadUrl ? "Jornal PDF pronto" : "Gerando Jornal PDF"}
+                {journalError
+                  ? "Erro ao gerar o jornal"
+                  : journalDownloadUrl
+                    ? "Jornal PDF pronto"
+                    : "Gerando Jornal PDF"}
               </h3>
 
               <p className="mt-2 text-sm text-gray-500">
@@ -914,7 +951,7 @@ export default function CardGenerator() {
                   ? "A geração foi interrompida. Veja a mensagem abaixo."
                   : journalDownloadUrl
                     ? "Clique no botão abaixo para baixar o arquivo PDF."
-                    : "Acompanhe cada etapa da geração do PDF diagramado."}
+                    : "A ferramenta vai gerar capa, uma página por categoria e anúncio final."}
               </p>
             </div>
 
@@ -922,7 +959,11 @@ export default function CardGenerator() {
               <div className="h-3 w-full overflow-hidden rounded-full bg-gray-100">
                 <div
                   className={`h-full transition-all duration-500 ease-out ${
-                    journalError ? "bg-red-600" : journalDownloadUrl ? "bg-teal-600" : "bg-blue-600"
+                    journalError
+                      ? "bg-red-600"
+                      : journalDownloadUrl
+                        ? "bg-teal-600"
+                        : "bg-blue-600"
                   }`}
                   style={{ width: `${journalProgress.step}%` }}
                 />
@@ -931,7 +972,11 @@ export default function CardGenerator() {
               <div className="flex items-center justify-between gap-4 text-sm">
                 <span
                   className={`font-medium ${
-                    journalError ? "text-red-600" : journalDownloadUrl ? "text-teal-600" : "text-blue-600"
+                    journalError
+                      ? "text-red-600"
+                      : journalDownloadUrl
+                        ? "text-teal-600"
+                        : "text-blue-600"
                   }`}
                 >
                   {journalError || journalProgress.message}
@@ -941,8 +986,7 @@ export default function CardGenerator() {
 
               {!journalError && !journalDownloadUrl && (
                 <div className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500">
-                  Se a mensagem continuar mudando, a ferramenta ainda está trabalhando.
-                  Se aparecer erro aqui, o problema será exibido sem travar a tela.
+                  O PDF final será montado com páginas separadas: capa, uma página para cada categoria e anúncio.
                 </div>
               )}
 
@@ -990,7 +1034,7 @@ export default function CardGenerator() {
   );
 }
 
-  const journalCss = `
+const journalCss = `
   @font-face {
     font-family: 'Inter';
     src: url('/fonts/Inter-Regular.ttf') format('truetype');
@@ -1014,42 +1058,43 @@ export default function CardGenerator() {
     display:flex;
     justify-content:center;
     align-items:flex-start;
-    background:#f3f4f6; /* Cinza claro para o fundo do visualizador */
+    background:#ffffff;
     padding:24px;
     border-radius:24px;
     border:1px solid rgba(0,0,0,.10);
   }
 
   .journal-preview-scaler{
-    width:672px;
+    width:324px;
     height:auto;
-    min-height:1200px;
+    min-height:576px;
     display:flex;
     justify-content:center;
     align-items:flex-start;
     flex-shrink:0;
-    transform:scale(.28);
+    transform:scale(.30);
     transform-origin:top center;
   }
 
   .journal-root{
-    width:2400px;
+    width:1080px;
     margin:0 auto;
-    background:#f3f4f6; /* Fundo cinza claro para a raiz do jornal */
+    background:#ffffff;
     color:#111;
     font-family:Inter,Arial,sans-serif;
   }
 
   .journal-page-label{
-    width:2400px;
-    height:54px;
+    width:1080px;
+    height:46px;
     display:flex;
     align-items:center;
     justify-content:center;
-    background:#374151; /* Cinza escuro para a label da página */
-    color:#ffffff;
-    border-bottom:1px solid #1f2937;
-    font-size:22px;
+    background:#ffffff;
+    color:#111111;
+    border:1px solid rgba(0,0,0,.12);
+    border-bottom:0;
+    font-size:18px;
     font-weight:900;
     letter-spacing:.04em;
     text-transform:uppercase;
@@ -1057,25 +1102,26 @@ export default function CardGenerator() {
 
   .journal-page{
     position:relative;
-    width:2400px;
-    height:4267px;
-    background:#ffffff; /* Páginas brancas para contraste */
+    width:1080px;
+    height:1920px;
+    background:#ffffff;
     overflow:hidden;
     display:flex;
     align-items:center;
     justify-content:center;
-    page-break-after:always;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.05); /* Sombra suave nas páginas */
-    margin-bottom: 40px;
+    box-shadow:0 20px 50px rgba(0,0,0,.08);
+    margin-bottom:40px;
   }
 
-  .journal-cover,
+  .journal-cover-page,
+  .journal-ad-page,
   .journal-header,
   .journal-card-wrap{
     cursor:pointer;
   }
 
-  .journal-cover img{
+  .journal-cover-page img,
+  .journal-ad-page img{
     position:absolute;
     inset:0;
     width:100%;
@@ -1086,14 +1132,14 @@ export default function CardGenerator() {
 
   .journal-placeholder{
     position:absolute;
-    inset:80px;
-    border:4px dashed rgba(0,0,0,.35);
+    inset:48px;
+    border:3px dashed rgba(0,0,0,.35);
     display:flex;
-    gap:24px;
+    gap:20px;
     align-items:center;
     justify-content:center;
     text-align:center;
-    font-size:48px;
+    font-size:34px;
     font-weight:900;
     color:#111;
     background:rgba(255,255,255,.72);
@@ -1101,26 +1147,26 @@ export default function CardGenerator() {
     pointer-events:none;
   }
 
-  .journal-flow-page{
-    width:2400px;
-    min-height:4267px;
-    padding-bottom:90px;
-    background:#ffffff; /* Fundo branco para a página de cards */
-    page-break-after:always;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.05);
-    margin-bottom: 40px;
+  .journal-category-page{
+    width:1080px;
+    min-height:1920px;
+    padding-bottom:44px;
+    background:#ffffff;
+    box-shadow:0 20px 50px rgba(0,0,0,.08);
+    margin-bottom:40px;
+    overflow:visible;
   }
 
   .journal-header{
     position:relative;
-    width:2400px;
-    height:578px;
+    width:1080px;
+    height:260px;
     background:#0b2341;
     color:#fff;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:54px;
+    font-size:38px;
     font-weight:900;
     overflow:hidden;
   }
@@ -1141,13 +1187,9 @@ export default function CardGenerator() {
     pointer-events:none;
   }
 
-  .journal-category{
-    width:2400px;
-  }
-
   .journal-category-bar{
-    width:calc(100% - 160px);
-    margin:70px auto 30px auto;
+    width:calc(100% - 72px);
+    margin:38px auto 24px auto;
     background:#0f6bc8;
     color:white;
     display:flex;
@@ -1155,11 +1197,11 @@ export default function CardGenerator() {
     justify-content:center;
     text-transform:uppercase;
     text-align:center;
-    font-size:52px;
+    font-size:30px;
     line-height:1;
     font-weight:900;
     letter-spacing:.04em;
-    padding:24px 60px;
+    padding:18px 36px;
     border-radius:999px;
     box-sizing:border-box;
   }
@@ -1167,20 +1209,20 @@ export default function CardGenerator() {
   .journal-grid{
     display:flex;
     flex-wrap:wrap;
-    gap:70px;
+    gap:28px;
     justify-content:center;
-    padding:30px 80px 70px 80px;
+    padding:20px 36px 36px 36px;
     box-sizing:border-box;
   }
 
   .journal-card-wrap{
     position:relative;
-    width:700px;
-    height:1058px;
-    border-radius:48px;
+    width:315px;
+    height:476px;
+    border-radius:22px;
     overflow:hidden;
     background:#fff;
-    box-shadow:0 16px 32px rgba(0,0,0,.10);
+    box-shadow:0 10px 20px rgba(0,0,0,.12);
   }
 
   .journal-card-shadow-host{
@@ -1189,23 +1231,25 @@ export default function CardGenerator() {
     height:1058px;
     overflow:hidden;
     background:#fff;
+    transform:scale(.45);
+    transform-origin:top left;
   }
 
   .journal-footer-text{
-    margin:30px 120px 0 120px;
-    padding:24px 36px;
-    border-top:2px solid rgba(255,255,255,.35);
+    margin:12px 54px 0 54px;
+    padding:18px 24px;
+    border-top:2px solid rgba(0,0,0,.16);
     text-align:center;
-    font-size:22px;
+    font-size:16px;
     line-height:1.32;
     font-weight:500;
     outline:2px dashed transparent;
-    color:#fff;
+    color:#111;
   }
 
   .journal-footer-text:focus{
     outline-color:#0f6bc8;
-    background:rgba(0,0,0,.18);
+    background:rgba(15,107,200,.06);
   }
 
   @media print{

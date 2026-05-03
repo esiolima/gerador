@@ -31,7 +31,8 @@ export default function Login() {
         {/* 🧠 TÍTULO */}
         <h1 className="text-center text-3xl md:text-4xl font-black tracking-tight">
           <span className="bg-gradient-to-r from-sky-300 to-blue-500 bg-clip-text text-transparent">
-            Gerador de Ações de Trade Marketing
+            Gerador de Ações de 
+            Trade Marketing
           </span>
         </h1>
 

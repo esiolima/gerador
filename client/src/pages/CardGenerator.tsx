@@ -772,10 +772,10 @@ export default function CardGenerator() {
                 <div>
                   <h2 className="text-2xl font-black">Processando cards</h2>
                   <p className="text-white/45">
-                    {progress.currentCard || `${progress.processed}/${progress.total}`}
+                    {progress.processed} de {progress.total}
                   </p>
                 </div>
-
+   
                 <div className="h-3 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full bg-blue-500 transition-all"

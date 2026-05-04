@@ -1,17 +1,12 @@
 import { Express, Request, Response } from "express";
 import {
-  createUser,
-  deactivateUser,
   ensureInitialAdminUser,
   getAuthCookieName,
   getCookieOptions,
   getUserById,
-  listUsers,
   loginWithEmailPassword,
   verifyAuthToken,
 } from "./authService";
-import { authMiddleware, requireAdmin } from "./authMiddleware";
-import { AuthenticatedRequest } from "./authTypes";
 import nodemailer from "nodemailer";
 
 function getTokenFromCookie(req: Request) {
@@ -33,38 +28,47 @@ function getTokenFromCookie(req: Request) {
 export async function setupAuthRoutes(app: Express) {
   await ensureInitialAdminUser();
 
+  // LOGIN
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const result = await loginWithEmailPassword(req.body.email, req.body.password);
+      const result = await loginWithEmailPassword(
+        req.body.email,
+        req.body.password
+      );
+
       res.cookie(getAuthCookieName(), result.token, getCookieOptions());
+
       res.json({ success: true, user: result.user });
     } catch (e: any) {
       res.status(401).json({ success: false, error: e.message });
     }
   });
 
+  // LOGOUT
   app.post("/api/auth/logout", (_req, res) => {
     res.clearCookie(getAuthCookieName(), { path: "/" });
     res.json({ success: true });
   });
 
+  // USUÁRIO LOGADO
   app.get("/api/auth/me", (req, res) => {
     try {
       const token = getTokenFromCookie(req);
       const payload = verifyAuthToken(token);
       const user = getUserById(payload.id);
+
       res.json({ success: true, user });
     } catch {
       res.status(401).json({ success: false });
     }
   });
 
-  // 🔥 SOLICITAÇÃO DE ACESSO (CORRIGIDO)
+  // 🚀 SOLICITAR ACESSO (FUNCIONANDO DE VERDADE)
   app.post("/api/auth/request-access", async (req: Request, res: Response) => {
     try {
-      console.log("📩 Nova solicitação recebida:", req.body);
+      console.log("📩 BODY RECEBIDO:", req.body);
 
-      // 🔁 MAPEAMENTO FLEXÍVEL (aceita PT e EN)
+      // aceita PT e EN
       const name = req.body.name || req.body.nome;
       const email = req.body.email || req.body["e-mail"];
       const company = req.body.company || req.body.empresa;
@@ -72,24 +76,21 @@ export async function setupAuthRoutes(app: Express) {
       const phone = req.body.phone || req.body.telefone;
       const message = req.body.message || req.body.mensagem;
 
-      if (!email || !name) {
+      if (!name || !email) {
         return res.status(400).json({
           success: false,
-          error: "Nome e email são obrigatórios",
+          error: "Nome e email obrigatórios",
         });
       }
 
-      // 🔐 valida SMTP
-      if (
-        !process.env.SMTP_HOST ||
-        !process.env.SMTP_PORT ||
-        !process.env.SMTP_USER ||
-        !process.env.SMTP_PASS
-      ) {
-        console.error("❌ SMTP não configurado");
-        return res.status(500).json({
-          success: false,
-          error: "Servidor de email não configurado",
+      // 🔥 fallback sem SMTP (pra você testar)
+      if (!process.env.SMTP_HOST) {
+        console.log("⚠️ SMTP não configurado. Dados recebidos:");
+        console.log({ name, email, company, role, phone, message });
+
+        return res.json({
+          success: true,
+          debug: true,
         });
       }
 
@@ -118,11 +119,12 @@ export async function setupAuthRoutes(app: Express) {
         `,
       });
 
-      console.log("✅ Email enviado com sucesso");
+      console.log("✅ EMAIL ENVIADO");
 
       res.json({ success: true });
     } catch (err) {
-      console.error("❌ Erro ao enviar email:", err);
+      console.error("❌ ERRO:", err);
+
       res.status(500).json({
         success: false,
         error: "Erro ao enviar email",

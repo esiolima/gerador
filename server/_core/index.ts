@@ -49,29 +49,23 @@ async function startServer() {
     },
   });
 
-  // 🔥 IMPORTANTE: garantir leitura do body
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));
 
-  registerOAuthRoutes(app);
-
-  // 🔐 rotas de auth (login, request-access, etc)
+  // 🔐 ROTAS DE AUTH (LOGIN, ME, REQUEST-ACCESS)
   await setupAuthRoutes(app);
 
-  // 🔥 CORREÇÃO AQUI — liberar rotas públicas
+  registerOAuthRoutes(app);
+
+  // 🔥 PROTEÇÃO INTELIGENTE (NÃO BLOQUEIA AUTH)
   app.use("/api", (req, res, next) => {
-    if (
-      req.path.startsWith("/auth/login") ||
-      req.path.startsWith("/auth/request-access") ||
-      req.path.startsWith("/auth/me")
-    ) {
-      return next();
+    if (req.path.startsWith("/auth")) {
+      return next(); // libera /api/auth/*
     }
 
-    return authMiddleware(req, res, next);
+    return authMiddleware(req, res, next); // protege resto
   });
 
-  // tRPC protegido
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -108,7 +102,6 @@ async function startServer() {
     serveStatic(app);
   }
 
-  // limpeza de arquivos temporários
   const uploadsDir = path.resolve("uploads");
   const outputDir = path.resolve("output");
   const tmpDir = path.resolve("tmp");
@@ -120,9 +113,7 @@ async function startServer() {
       for (const file of files) {
         try {
           fs.unlinkSync(path.join(dir, file));
-        } catch {
-          // ignora erros
-        }
+        } catch {}
       }
     }
   }
@@ -140,8 +131,8 @@ async function startServer() {
   });
 }
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
 });
 
 process.on("uncaughtException", (error) => {

@@ -49,15 +49,29 @@ async function startServer() {
     },
   });
 
+  // 🔥 IMPORTANTE: garantir leitura do body
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ limit: "100mb", extended: true }));
 
   registerOAuthRoutes(app);
 
+  // 🔐 rotas de auth (login, request-access, etc)
   await setupAuthRoutes(app);
 
-  app.use("/api", authMiddleware);
+  // 🔥 CORREÇÃO AQUI — liberar rotas públicas
+  app.use("/api", (req, res, next) => {
+    if (
+      req.path.startsWith("/auth/login") ||
+      req.path.startsWith("/auth/request-access") ||
+      req.path.startsWith("/auth/me")
+    ) {
+      return next();
+    }
 
+    return authMiddleware(req, res, next);
+  });
+
+  // tRPC protegido
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -94,6 +108,7 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // limpeza de arquivos temporários
   const uploadsDir = path.resolve("uploads");
   const outputDir = path.resolve("output");
   const tmpDir = path.resolve("tmp");
@@ -106,7 +121,7 @@ async function startServer() {
         try {
           fs.unlinkSync(path.join(dir, file));
         } catch {
-          // Ignora erros de limpeza
+          // ignora erros
         }
       }
     }

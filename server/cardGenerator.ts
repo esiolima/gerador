@@ -211,9 +211,70 @@ export class CardGenerator extends EventEmitter {
   }
 
   private validateRows(rows: any[]): void {
-    if (!rows.length) {
-      throw new Error("A planilha não possui linhas de dados para processar.");
+        );
+      }
+
+      if (!complemento) {
+        throw new Error(
+          `Linha ${line}: template SOMA exige o campo COMPLEMENTO.`
+        );
+      }
+
+      return;
     }
+
+    // LOGO obrigatório
+    if (!logo) {
+      throw new Error(
+        `Linha ${line}: campo LOGO não pode ficar vazio.`
+      );
+    }
+
+    // CUPOM
+    if (tipo === "cupom") {
+      if (!cupom) {
+        throw new Error(
+          `Linha ${line}: template CUPOM exige o campo CUPOM preenchido.`
+        );
+      }
+    }
+
+    // PROMOCAO
+    if (tipo === "promocao") {
+      if (!valor) {
+        throw new Error(
+          `Linha ${line}: template PROMOCAO exige o campo VALOR.`
+        );
+      }
+
+      return;
+    }
+
+    // QUEDA / BC / CASHBACK
+    if (["queda", "bc", "cashback"].includes(tipo)) {
+      if (!valor) {
+        throw new Error(
+          `Linha ${line}: template ${tipo.toUpperCase()} exige o campo VALOR.`
+        );
+      }
+
+      const normalizedValue = valor
+        .replace(/%/g, "")
+        .replace(/\./g, ",")
+        .trim();
+
+      const numericValidation = normalizedValue.replace(/,/g, ".");
+
+      if (isNaN(Number(numericValidation))) {
+        throw new Error(
+          `Linha ${line}: template ${tipo.toUpperCase()} aceita apenas números no VALOR.`
+        );
+      }
+
+      row.valor = normalizedValue;
+    }
+  });
+}
 
     const headers = Object.keys(rows[0] ?? {}).map((h) => h.toLowerCase().trim());
     const missing = ["tipo"].filter((h) => !headers.includes(h));

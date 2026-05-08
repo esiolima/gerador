@@ -232,13 +232,12 @@ export class CardGenerator extends EventEmitter {
         throw new Error(`Erro na linha ${line}: a coluna "tipo" está vazia.`);
       }
 
-      if (!tipo || !VALID_TYPES.includes(tipo)) {
-        throw new Error(
-          `Erro na linha ${line}: tipo "${row.tipo}" não reconhecido. Use promocao, cupom, cashback, queda, bc, soma ou nada.`
-        );
-}
-      
+      if (!tipo || !VALID_TYPES.includes(tipo)) { 
+        throw new Error( 
+           `Erro na linha ${line}: tipo "${row.tipo}" não reconhecido. Use promocao, cupom, cashback, queda, bc, soma ou nada.` 
+        ); 
       }
+      
 
       if (tipo === "cupom" && !String(row.cupom ?? "").trim()) {
         throw new Error(

@@ -212,72 +212,147 @@ export class CardGenerator extends EventEmitter {
 
   private validateRows(rows: any[]): void {
     if (!rows || rows.length === 0) {
-      throw new Error("A planilha está vazia.");
+      throw new Error("A planilha está vazia."); [cite: 2]
     }
 
-    const headers = Object.keys(rows[0] ?? {}).map((h) => h.toLowerCase().trim());
-    const missing = ["tipo"].filter((h) => !headers.includes(h));
+    const headers = Object.keys(rows[0] ?? {}).map((h) =>
+      h.toLowerCase().trim()
+    );
 
-    if (missing.length) {
+    const requiredHeaders = ["ordem", "tipo"]; [cite: 3]
+    const missingHeaders = requiredHeaders.filter(
+      (header) => !headers.includes(header)
+    );
+
+    if (missingHeaders.length) { [cite: 4]
       throw new Error(
-        `Coluna obrigatória ausente: ${missing.join(", ")}. Use nomes em minúsculo.`
+        `Colunas obrigatórias ausentes: ${missingHeaders.join(", ")}.`
       );
     }
 
-    rows.forEach((row, index) => {
+    const errors: string[] = []; [cite: 5]
+    const usedOrders = new Set<string>();
+
+    rows.forEach((row, index) => { [cite: 6]
       const line = index + 2;
-      const tipo = this.normalizeType(row.tipo);
+
+      const ordem = String(row.ordem ?? "").trim();
+      const tipoOriginal = String(row.tipo ?? "").trim();
+      const tipo = this.normalizeType(tipoOriginal);
+
       const valor = String(row.valor ?? "").trim();
       const cupom = String(row.cupom ?? "").trim();
       const logo = String(row.logo ?? "").trim();
       const complemento = String(row.complemento ?? "").trim();
 
-      if (!String(row.tipo ?? "").trim()) {
-        throw new Error(`Erro na linha ${line}: a coluna "tipo" está vazia.`);
+      const selo = String(row.selo ?? "")
+        .trim()
+        .toLowerCase();
+
+      if (!ordem) { [cite: 7]
+        errors.push(`Linha ${line}: campo ORDEM vazio.`);
+      } else {
+        if (usedOrders.has(ordem)) {
+          errors.push(`Linha ${line}: ordem duplicada (${ordem}).`);
+        }
+
+        if (isNaN(Number(ordem))) {
+          errors.push(`Linha ${line}: ORDEM deve ser numérica.`);
+        }
+
+        usedOrders.add(ordem);
       }
 
-      if (!tipo || !VALID_TYPES.includes(tipo)) {
-        throw new Error(
-          `Erro na linha ${line}: tipo "${row.tipo}" não reconhecido. Use promocao, cupom, cashback, queda, bc, soma ou nada.`
-        );
-      }
-
-      // Validação por tipo
-      if (tipo === "soma") {
-        if (!valor) throw new Error(`Linha ${line}: template SOMA exige o campo VALOR.`);
-        if (!complemento) throw new Error(`Linha ${line}: template SOMA exige o campo COMPLEMENTO.`);
+      if (!tipoOriginal) {
+        errors.push(`Linha ${line}: coluna TIPO vazia.`); [cite: 8]
         return;
       }
 
-      if (tipo === "nada") return;
-
-      // LOGO costuma ser obrigatório para os demais
-      if (!logo) {
-        throw new Error(`Linha ${line}: campo LOGO não pode ficar vazio.`);
+      if (!tipo || !VALID_TYPES.includes(tipo)) { [cite: 9]
+        errors.push(
+          `Linha ${line}: tipo "${tipoOriginal}" não reconhecido.`
+        );
+        return;
       }
 
-      if (tipo === "cupom" && !cupom) {
-        throw new Error(`Linha ${line}: template CUPOM exige o campo CUPOM preenchido.`);
+      if (
+        selo &&
+        !["nova", "novo", "renovada", "renovado"].includes(selo) [cite: 10]
+      ) {
+        errors.push(
+          `Linha ${line}: selo inválido. Use nova, novo, renovada ou renovado.`
+        );
       }
 
-      if (tipo === "promocao" && !valor) {
-        throw new Error(`Linha ${line}: template PROMOCAO exige o campo VALOR.`);
+      if (tipo === "nada") { [cite: 11]
+        return;
+      }
+
+      if (tipo === "soma") {
+        if (!valor) { [cite: 12]
+          errors.push(
+            `Linha ${line}: template SOMA exige o campo VALOR.`
+          );
+        }
+
+        if (!complemento) { [cite: 13]
+          errors.push(
+            `Linha ${line}: template SOMA exige o campo COMPLEMENTO.`
+          );
+        }
+
+        return;
+      }
+
+      if (!logo) { [cite: 14]
+        errors.push(
+          `Linha ${line}: campo LOGO não pode ficar vazio.`
+        );
+      }
+
+      if (tipo === "cupom" && !cupom) { [cite: 15]
+        errors.push(
+          `Linha ${line}: template CUPOM exige o campo CUPOM preenchido.`
+        );
+      }
+
+      if (tipo === "promocao") {
+        if (!valor) { [cite: 16]
+          errors.push(
+            `Linha ${line}: template PROMOCAO exige o campo VALOR.`
+          );
+        }
+
+        return;
       }
 
       if (["queda", "bc", "cashback"].includes(tipo)) {
-        if (!valor) {
-          throw new Error(`Linha ${line}: template ${tipo.toUpperCase()} exige o campo VALOR.`);
-        }
+        if (!valor) { [cite: 17]
+          errors.push(
+            `Linha ${line}: template ${tipo.toUpperCase()} exige o campo VALOR.`
+          );
+        } else {
+          const normalizedValue = valor [cite: 18]
+            .replace(/%/g, "")
+            .replace(/\./g, ",")
+            .trim();
 
-        const normalizedValue = valor.replace(/%/g, "").replace(/\./g, ",").trim();
-        const numericValidation = normalizedValue.replace(/,/g, ".");
+          const numericValidation = normalizedValue.replace(/,/g, ".");
 
-        if (isNaN(Number(numericValidation))) {
-          throw new Error(`Linha ${line}: template ${tipo.toUpperCase()} aceita apenas números no VALOR.`);
+          if (isNaN(Number(numericValidation))) { [cite: 19]
+            errors.push(
+              `Linha ${line}: template ${tipo.toUpperCase()} aceita apenas números no VALOR.`
+            );
+          }
+
+          row.valor = normalizedValue;
         }
-        row.valor = normalizedValue;
       }
     });
+
+    if (errors.length > 0) { [cite: 20]
+      throw new Error(errors.join("\n"));
+    }
   }
 
   private injectFittingHelpers(html: string): string {
@@ -590,9 +665,9 @@ export class CardGenerator extends EventEmitter {
           ? this.imageToBase64(
               path.join(
                 SELOS_DIR,
-                seloRaw === "nova"
+                seloRaw === "nova" || seloRaw === "novo"
                   ? "acaonova.png"
-                  : seloRaw === "renovada"
+                  : seloRaw === "renovada" || seloRaw === "renovado"
                     ? "acaorenovada.png"
                     : "blank.png"
               )

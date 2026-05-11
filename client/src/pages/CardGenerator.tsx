@@ -73,35 +73,48 @@ function getReadableTextColor(backgroundColor: string) {
   return luminance > 0.58 ? "#111111" : "#ffffff";
 }
 
-function buildJournalCardPages(
-  groupedCards: [string, GeneratedCard[]][]
-): JournalCardPage[] {
+function buildJournalCardPages(groupedCards: [string, GeneratedCard[]][]): JournalCardPage[] {
   const pages: JournalCardPage[] = [];
+  
+  // Pegamos a primeira categoria e os cards dela
+  const firstCategoryEntry = groupedCards[0];
+  if (!firstCategoryEntry) return pages;
 
-  groupedCards.forEach(([category, cards]) => {
-    let remainingCards = [...cards];
-    let pageIndexWithinCategory = 0;
+  const [firstCatName, firstCatCards] = firstCategoryEntry;
 
-   while (remainingCards.length > 0) {
-      // Se pageIndexWithinCategory for 0, é a primeira página daquela categoria
-      const limit =
-        pageIndexWithinCategory === 0
-          ? FIRST_CATEGORY_PAGE_CARD_LIMIT
-          : CONTINUATION_CATEGORY_PAGE_CARD_LIMIT;
-
-      const pageCards = remainingCards.slice(0, limit);
-      remainingCards = remainingCards.slice(limit);
-
-      pages.push({
-        category,
-        cards: pageCards,
-        pageIndexWithinCategory,
-        isContinuation: pageIndexWithinCategory > 0,
-      });
-
-      pageIndexWithinCategory += 1;
-    }
-  });
+  // REGRA ESPECIAL: Se a primeira for "NADA", ela ocupa os 6 primeiros espaços do cabeçalho
+  if (firstCatName.toUpperCase() === "NADA") {
+    pages.push({
+      category: "NADA",
+      cards: firstCatCards.slice(0, FIRST_CATEGORY_PAGE_CARD_LIMIT),
+      pageIndexWithinCategory: 0,
+      isContinuation: false,
+    });
+    
+    // Processamos o restante das categorias normalmente a partir do índice 1
+    groupedCards.slice(1).forEach(([category, cards]) => {
+      let remaining = [...cards];
+      let pageIdx = 0;
+      while (remaining.length > 0) {
+        const limit = pageIdx === 0 ? FIRST_CATEGORY_PAGE_CARD_LIMIT : CONTINUATION_CATEGORY_PAGE_CARD_LIMIT;
+        pages.push({ category, cards: remaining.slice(0, limit), pageIndexWithinCategory: pageIdx, isContinuation: pageIdx > 0 });
+        remaining = remaining.slice(limit);
+        pageIdx++;
+      }
+    });
+  } else {
+    // Se não começar com "NADA", mantém a lógica original para todas
+    groupedCards.forEach(([category, cards]) => {
+      let remaining = [...cards];
+      let pageIdx = 0;
+      while (remaining.length > 0) {
+        const limit = pageIdx === 0 ? FIRST_CATEGORY_PAGE_CARD_LIMIT : CONTINUATION_CATEGORY_PAGE_CARD_LIMIT;
+        pages.push({ category, cards: remaining.slice(0, limit), pageIndexWithinCategory: pageIdx, isContinuation: pageIdx > 0 });
+        remaining = remaining.slice(limit);
+        pageIdx++;
+      }
+    });
+  }
 
   return pages;
 }

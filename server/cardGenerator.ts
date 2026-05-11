@@ -212,7 +212,7 @@ export class CardGenerator extends EventEmitter {
 
   private validateRows(rows: any[]): void {
     if (!rows || rows.length === 0) {
-      throw new Error("A planilha está vazia."); [cite: 2]
+      throw new Error("A planilha está vazia.");
     }
 
     const headers = Object.keys(rows[0] ?? {}).map((h) =>

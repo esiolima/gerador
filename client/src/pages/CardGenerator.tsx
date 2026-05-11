@@ -52,6 +52,7 @@ type JournalCardPage = {
   cards: GeneratedCard[];
   pageIndexWithinCategory: number;
   isContinuation: boolean;
+  isAfterNada?: boolean;
 };
 
 type CategoryBarImages = Record<string, { left?: string; right?: string }>;
@@ -75,14 +76,12 @@ function getReadableTextColor(backgroundColor: string) {
 
 function buildJournalCardPages(groupedCards: [string, GeneratedCard[]][]): JournalCardPage[] {
   const pages: JournalCardPage[] = [];
-  
-  // Pegamos a primeira categoria e os cards dela
+
   const firstCategoryEntry = groupedCards[0];
   if (!firstCategoryEntry) return pages;
 
   const [firstCatName, firstCatCards] = firstCategoryEntry;
 
-  // REGRA ESPECIAL: Se a primeira for "NADA", ela ocupa os 6 primeiros espaços do cabeçalho
   if (firstCatName.toUpperCase() === "NADA") {
     pages.push({
       category: "NADA",
@@ -90,26 +89,35 @@ function buildJournalCardPages(groupedCards: [string, GeneratedCard[]][]): Journ
       pageIndexWithinCategory: 0,
       isContinuation: false,
     });
-    
-    // Processamos o restante das categorias normalmente a partir do índice 1
-    groupedCards.slice(1).forEach(([category, cards]) => {
+
+    groupedCards.slice(1).forEach(([category, cards], relativeIndex) => {
       let remaining = [...cards];
       let pageIdx = 0;
       while (remaining.length > 0) {
         const limit = pageIdx === 0 ? FIRST_CATEGORY_PAGE_CARD_LIMIT : CONTINUATION_CATEGORY_PAGE_CARD_LIMIT;
-        pages.push({ category, cards: remaining.slice(0, limit), pageIndexWithinCategory: pageIdx, isContinuation: pageIdx > 0 });
+        pages.push({
+          category,
+          cards: remaining.slice(0, limit),
+          pageIndexWithinCategory: pageIdx,
+          isContinuation: pageIdx > 0,
+          isAfterNada: relativeIndex === 0 && pageIdx === 0,
+        });
         remaining = remaining.slice(limit);
         pageIdx++;
       }
     });
   } else {
-    // Se não começar com "NADA", mantém a lógica original para todas
     groupedCards.forEach(([category, cards]) => {
       let remaining = [...cards];
       let pageIdx = 0;
       while (remaining.length > 0) {
         const limit = pageIdx === 0 ? FIRST_CATEGORY_PAGE_CARD_LIMIT : CONTINUATION_CATEGORY_PAGE_CARD_LIMIT;
-        pages.push({ category, cards: remaining.slice(0, limit), pageIndexWithinCategory: pageIdx, isContinuation: pageIdx > 0 });
+        pages.push({
+          category,
+          cards: remaining.slice(0, limit),
+          pageIndexWithinCategory: pageIdx,
+          isContinuation: pageIdx > 0,
+        });
         remaining = remaining.slice(limit);
         pageIdx++;
       }
@@ -1104,47 +1112,59 @@ export default function CardGenerator() {
                     </div>
                   </div>
 
-                  {journalCardPages.map((journalPage, pageIndex) => {
-                    const nextPage = journalCardPages[pageIndex + 1];
-                    const isLastPageOfCategory =
-                      !nextPage || nextPage.category !== journalPage.category;
-                    const categoryBackground = getCategoryBackground(journalPage.category);
-                    const categoryBarColor = getCategoryBarColor(journalPage.category);
-                    const categoryBarTextColor = getReadableTextColor(categoryBarColor);
-                    const categoryBarLeftImage = getCategoryBarImage(journalPage.category, "left");
-                    const categoryBarRightImage = getCategoryBarImage(journalPage.category, "right");
-                    const footerTextColor = getReadableTextColor(categoryBackground);
-                    const footerBorderColor =
-                      footerTextColor === "#ffffff"
-                        ? "rgba(255,255,255,.38)"
-                        : "rgba(0,0,0,.16)";
+                  {(() => {
+                    // Agrupa páginas: se isAfterNada=true, junta com a página NADA anterior numa mesma section
+                    const renderGroups: Array<{ nadaPage?: JournalCardPage; mainPage: JournalCardPage; pageIndex: number }[]> = [];
+                    let i = 0;
+                    while (i < journalCardPages.length) {
+                      const page = journalCardPages[i];
+                      if (page.category.toUpperCase() === "NADA" && journalCardPages[i + 1]?.isAfterNada) {
+                        // Agrupa NADA + primeira categoria seguinte
+                        renderGroups.push([
+                          { nadaPage: page, mainPage: journalCardPages[i + 1], pageIndex: i },
+                        ]);
+                        i += 2;
+                      } else if (page.isAfterNada) {
+                        // Segurança: se chegou aqui sem ter sido agrupado, renderiza normal
+                        renderGroups.push([{ mainPage: page, pageIndex: i }]);
+                        i++;
+                      } else {
+                        renderGroups.push([{ mainPage: page, pageIndex: i }]);
+                        i++;
+                      }
+                    }
 
-                    // Lógica para esconder tarja e cabeçalho se categoria for "nada"
-                    const isHiddenCategory = journalPage.category.toLowerCase() === "nada";
+                    return renderGroups.map((group) => {
+                      // Caso agrupado: NADA + próxima categoria na mesma section
+                      if (group[0].nadaPage) {
+                        const { nadaPage, mainPage, pageIndex } = group[0];
+                        const nextAfterMain = journalCardPages[pageIndex + 2];
+                        const isLastPageOfMainCategory =
+                          !nextAfterMain || nextAfterMain.category !== mainPage.category;
+                        const mainCategoryBackground = getCategoryBackground(mainPage.category);
+                        const mainCategoryBarColor = getCategoryBarColor(mainPage.category);
+                        const mainCategoryBarTextColor = getReadableTextColor(mainCategoryBarColor);
+                        const mainCategoryBarLeftImage = getCategoryBarImage(mainPage.category, "left");
+                        const mainCategoryBarRightImage = getCategoryBarImage(mainPage.category, "right");
+                        const footerTextColor = getReadableTextColor(mainCategoryBackground);
+                        const footerBorderColor =
+                          footerTextColor === "#ffffff"
+                            ? "rgba(255,255,255,.38)"
+                            : "rgba(0,0,0,.16)";
 
-                    return (
-                      <div
-                        key={`${journalPage.category}-${journalPage.pageIndexWithinCategory}`}
-                      >
-                        <div className="journal-page-label">
-                          Página {pageIndex + 2} — {journalPage.category}
-                          {journalPage.isContinuation ? " — continuação" : ""}
-                        </div>
+                        return (
+                          <div key={`nada-merged-${pageIndex}`}>
+                            <div className="journal-page-label">
+                              Página {pageIndex + 2} — {nadaPage.category} + {mainPage.category}
+                            </div>
 
-                        <section
-                          className={`journal-category-page ${
-                            journalPage.isContinuation ? "is-continuation" : ""
-                          } ${isLastPageOfCategory ? "is-last-category-page" : ""}`}
-                          data-journal-page="category"
-                          data-journal-title={
-                            journalPage.isContinuation
-                              ? `${journalPage.category} - continuação ${journalPage.pageIndexWithinCategory + 1}`
-                              : journalPage.category
-                          }
-                          style={{ background: categoryBackground }}
-                        >
-                          {!journalPage.isContinuation && !isHiddenCategory && (
-                            <>
+                            <section
+                              className="journal-category-page is-last-category-page"
+                              data-journal-page="category"
+                              data-journal-title={nadaPage.category}
+                              style={{ background: mainCategoryBackground }}
+                            >
+                              {/* Cabeçalho — aparece pois é a primeira página */}
                               <div
                                 className="journal-header"
                                 onClick={() => headerInputRef.current?.click()}
@@ -1153,11 +1173,27 @@ export default function CardGenerator() {
                                 <span>Cabeçalho</span>
                               </div>
 
+                              {/* Cards da categoria NADA (sem tarja) */}
+                              <div className="journal-grid pt-12">
+                                {nadaPage.cards.map((card, index) => (
+                                  <div
+                                    className="journal-card-wrap"
+                                    key={`${card.ordem}-${card.tipo}-${index}`}
+                                  >
+                                    <ShadowCard
+                                      html={card.html}
+                                      cardKey={`${card.ordem}-${card.tipo}-${index}`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Tarja da próxima categoria */}
                               <div
                                 className="journal-category-bar"
                                 style={{
-                                  background: categoryBarColor,
-                                  color: categoryBarTextColor,
+                                  background: mainCategoryBarColor,
+                                  color: mainCategoryBarTextColor,
                                 }}
                               >
                                 <button
@@ -1165,72 +1201,196 @@ export default function CardGenerator() {
                                   className="journal-category-bar-image-slot"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    chooseCategoryBarImage(journalPage.category, "left");
+                                    chooseCategoryBarImage(mainPage.category, "left");
                                   }}
-                                  title={`Imagem esquerda da tarja ${journalPage.category}`}
+                                  title={`Imagem esquerda da tarja ${mainPage.category}`}
                                 >
-                                  {categoryBarLeftImage ? (
-                                    <img src={categoryBarLeftImage} alt="Imagem esquerda da tarja" />
+                                  {mainCategoryBarLeftImage ? (
+                                    <img src={mainCategoryBarLeftImage} alt="Imagem esquerda da tarja" />
                                   ) : (
                                     <span className="journal-category-bar-image-placeholder" />
                                   )}
                                 </button>
-
-                                <span className="journal-category-bar-title">
-                                  {journalPage.category}
-                                </span>
-
+                                <span className="journal-category-bar-title">{mainPage.category}</span>
                                 <button
                                   type="button"
                                   className="journal-category-bar-image-slot"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    chooseCategoryBarImage(journalPage.category, "right");
+                                    chooseCategoryBarImage(mainPage.category, "right");
                                   }}
-                                  title={`Imagem direita da tarja ${journalPage.category}`}
+                                  title={`Imagem direita da tarja ${mainPage.category}`}
                                 >
-                                  {categoryBarRightImage ? (
-                                    <img src={categoryBarRightImage} alt="Imagem direita da tarja" />
+                                  {mainCategoryBarRightImage ? (
+                                    <img src={mainCategoryBarRightImage} alt="Imagem direita da tarja" />
                                   ) : (
                                     <span className="journal-category-bar-image-placeholder" />
                                   )}
                                 </button>
                               </div>
-                            </>
-                          )}
 
-                          <div className={`journal-grid ${isHiddenCategory ? "pt-12" : ""}`}>
-                            {journalPage.cards.map((card, index) => (
-                              <div
-                                className="journal-card-wrap"
-                                key={`${card.ordem}-${card.tipo}-${index}`}
-                              >
-                                <ShadowCard
-                                  html={card.html}
-                                  cardKey={`${card.ordem}-${card.tipo}-${index}`}
-                                />
+                              {/* Cards da categoria principal */}
+                              <div className="journal-grid">
+                                {mainPage.cards.map((card, index) => (
+                                  <div
+                                    className="journal-card-wrap"
+                                    key={`${card.ordem}-${card.tipo}-${index}`}
+                                  >
+                                    <ShadowCard
+                                      html={card.html}
+                                      cardKey={`${card.ordem}-${card.tipo}-${index}`}
+                                    />
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+
+                              {isLastPageOfMainCategory && (
+                                <div
+                                  className="journal-footer-text"
+                                  style={{
+                                    color: footerTextColor,
+                                    borderTopColor: footerBorderColor,
+                                  }}
+                                  contentEditable
+                                  suppressContentEditableWarning
+                                  onBlur={(event) => setFooterText(event.currentTarget.innerText)}
+                                >
+                                  {footerText}
+                                </div>
+                              )}
+                            </section>
+                          </div>
+                        );
+                      }
+
+                      // Caso normal: renderiza a página individualmente
+                      const { mainPage: journalPage, pageIndex } = group[0];
+                      const nextPage = journalCardPages[pageIndex + 1];
+                      const isLastPageOfCategory =
+                        !nextPage || nextPage.category !== journalPage.category;
+                      const categoryBackground = getCategoryBackground(journalPage.category);
+                      const categoryBarColor = getCategoryBarColor(journalPage.category);
+                      const categoryBarTextColor = getReadableTextColor(categoryBarColor);
+                      const categoryBarLeftImage = getCategoryBarImage(journalPage.category, "left");
+                      const categoryBarRightImage = getCategoryBarImage(journalPage.category, "right");
+                      const footerTextColor = getReadableTextColor(categoryBackground);
+                      const footerBorderColor =
+                        footerTextColor === "#ffffff"
+                          ? "rgba(255,255,255,.38)"
+                          : "rgba(0,0,0,.16)";
+
+                      const isHiddenCategory = journalPage.category.toLowerCase() === "nada";
+
+                      return (
+                        <div
+                          key={`${journalPage.category}-${journalPage.pageIndexWithinCategory}`}
+                        >
+                          <div className="journal-page-label">
+                            Página {pageIndex + 2} — {journalPage.category}
+                            {journalPage.isContinuation ? " — continuação" : ""}
                           </div>
 
-                          {isLastPageOfCategory && (
-                            <div
-                              className="journal-footer-text"
-                              style={{
-                                color: footerTextColor,
-                                borderTopColor: footerBorderColor,
-                              }}
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(event) => setFooterText(event.currentTarget.innerText)}
-                            >
-                              {footerText}
+                          <section
+                            className={`journal-category-page ${
+                              journalPage.isContinuation ? "is-continuation" : ""
+                            } ${isLastPageOfCategory ? "is-last-category-page" : ""}`}
+                            data-journal-page="category"
+                            data-journal-title={
+                              journalPage.isContinuation
+                                ? `${journalPage.category} - continuação ${journalPage.pageIndexWithinCategory + 1}`
+                                : journalPage.category
+                            }
+                            style={{ background: categoryBackground }}
+                          >
+                            {!journalPage.isContinuation && !isHiddenCategory && (
+                              <>
+                                <div
+                                  className="journal-header"
+                                  onClick={() => headerInputRef.current?.click()}
+                                >
+                                  <img src={headerImage} alt="Cabeçalho do jornal" />
+                                  <span>Cabeçalho</span>
+                                </div>
+
+                                <div
+                                  className="journal-category-bar"
+                                  style={{
+                                    background: categoryBarColor,
+                                    color: categoryBarTextColor,
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="journal-category-bar-image-slot"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      chooseCategoryBarImage(journalPage.category, "left");
+                                    }}
+                                    title={`Imagem esquerda da tarja ${journalPage.category}`}
+                                  >
+                                    {categoryBarLeftImage ? (
+                                      <img src={categoryBarLeftImage} alt="Imagem esquerda da tarja" />
+                                    ) : (
+                                      <span className="journal-category-bar-image-placeholder" />
+                                    )}
+                                  </button>
+
+                                  <span className="journal-category-bar-title">
+                                    {journalPage.category}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    className="journal-category-bar-image-slot"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      chooseCategoryBarImage(journalPage.category, "right");
+                                    }}
+                                    title={`Imagem direita da tarja ${journalPage.category}`}
+                                  >
+                                    {categoryBarRightImage ? (
+                                      <img src={categoryBarRightImage} alt="Imagem direita da tarja" />
+                                    ) : (
+                                      <span className="journal-category-bar-image-placeholder" />
+                                    )}
+                                  </button>
+                                </div>
+                              </>
+                            )}
+
+                            <div className={`journal-grid ${isHiddenCategory ? "pt-12" : ""}`}>
+                              {journalPage.cards.map((card, index) => (
+                                <div
+                                  className="journal-card-wrap"
+                                  key={`${card.ordem}-${card.tipo}-${index}`}
+                                >
+                                  <ShadowCard
+                                    html={card.html}
+                                    cardKey={`${card.ordem}-${card.tipo}-${index}`}
+                                  />
+                                </div>
+                              ))}
                             </div>
-                          )}
-                        </section>
-                      </div>
-                    );
-                  })}
+
+                            {isLastPageOfCategory && (
+                              <div
+                                className="journal-footer-text"
+                                style={{
+                                  color: footerTextColor,
+                                  borderTopColor: footerBorderColor,
+                                }}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onBlur={(event) => setFooterText(event.currentTarget.innerText)}
+                              >
+                                {footerText}
+                              </div>
+                            )}
+                          </section>
+                        </div>
+                      );
+                    });
+                  })()}
 
                   <div className="journal-page-label">
                     Página {journalCardPages.length + 2} — Anúncio

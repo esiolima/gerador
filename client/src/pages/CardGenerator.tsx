@@ -8,14 +8,13 @@ import {
   CheckCircle2,
   Download,
   Hourglass,
-  Image as ImageIcon,
+  ImageIcon,
   Newspaper,
   FileDown,
   FileText,
   RefreshCcw,
   Pencil,
   AlertCircle,
-  Palette,
 } from "lucide-react";
 
 type ProgressData = {
@@ -1019,7 +1018,7 @@ export default function CardGenerator() {
             <div className="journal-preview-viewport">
               <div className="journal-editor-controls" aria-label="Controles do jornal diagramado">
                 <p className="journal-editor-help">
-                  Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as imagens. Cada categoria será gerada como uma página independente.
+                  Clique na capa, cabeçalho, anúncio ou logo dos cards para substituir as imagens. Cada categoria será gerada como uma página independente. Use o nome "nada" na categoria para ocultar a tarja.
                 </p>
 
                 <div className="journal-editor-category-list">
@@ -1106,6 +1105,9 @@ export default function CardGenerator() {
                         ? "rgba(255,255,255,.38)"
                         : "rgba(0,0,0,.16)";
 
+                    // Lógica para esconder tarja e cabeçalho se categoria for "nada"
+                    const isHiddenCategory = journalPage.category.toLowerCase() === "nada";
+
                     return (
                       <div
                         key={`${journalPage.category}-${journalPage.pageIndexWithinCategory}`}
@@ -1127,7 +1129,7 @@ export default function CardGenerator() {
                           }
                           style={{ background: categoryBackground }}
                         >
-                          {!journalPage.isContinuation && (
+                          {!journalPage.isContinuation && !isHiddenCategory && (
                             <>
                               <div
                                 className="journal-header"
@@ -1183,7 +1185,7 @@ export default function CardGenerator() {
                             </>
                           )}
 
-                          <div className="journal-grid">
+                          <div className={`journal-grid ${isHiddenCategory ? "pt-12" : ""}`}>
                             {journalPage.cards.map((card, index) => (
                               <div
                                 className="journal-card-wrap"
@@ -1417,6 +1419,11 @@ export default function CardGenerator() {
 }
 
 const journalCss = `
+  /* ... (Mesmo CSS anterior, mantido para integridade) ... */
+  .journal-grid.pt-12 {
+    padding-top: 48px;
+  }
+  
   @font-face {
     font-family: 'Inter';
     src: url('/fonts/Inter-Regular.ttf') format('truetype');

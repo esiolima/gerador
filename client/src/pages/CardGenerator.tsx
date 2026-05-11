@@ -1790,13 +1790,12 @@ const journalCss = `
   }
 
   .journal-grid{
-    display:flex;
-    flex-wrap:wrap;
-    gap:20px;
-    justify-content:center;
-    align-content:flex-start;
-    padding:20px 36px 36px 36px;
-    box-sizing:border-box;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 20px 36px 36px 36px;
+    box-sizing: border-box;
+    align-content: start;
   }
 
   .journal-category-page:not(.is-last-category-page){
@@ -1813,7 +1812,7 @@ const journalCss = `
 
   .journal-card-wrap{
     position:relative;
-    width:315px;
+    width:100%;
     height:476px;
     border-radius:22px;
     overflow:hidden;

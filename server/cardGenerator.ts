@@ -216,7 +216,7 @@ export class CardGenerator extends EventEmitter {
     }
 
     const headers = Object.keys(rows[0] ?? {}).map((h) =>
-      h.toLowerCase().trim()
+      String(h || "").toLowerCase().trim()
     );
 
     const requiredHeaders = ["ordem", "tipo"];

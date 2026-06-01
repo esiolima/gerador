@@ -1521,7 +1521,7 @@ const [adPages, setAdPages] = useState<string[]>(() => {
                       </div>
                     </div>
                   ))}
-                  
+                </div>
               </div>
 
               <div className="journal-zoom-controls" aria-label="Controle de zoom do visualizador">
@@ -1573,8 +1573,6 @@ const [adPages, setAdPages] = useState<string[]>(() => {
               className="hidden"
               onChange={(event) => changeImage("header", event.target.files?.[0])}
             />
-
-
           </section>
         )}
       </main>

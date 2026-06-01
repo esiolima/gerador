@@ -336,15 +336,7 @@ private validateRows(rows: any[]): void {
         !VALID_TYPES.includes(tipo)
       ) {
         errors.push(
-          `Linha ${line}: o tipo "${tipoOriginal}" não é válido.
-
-Use apenas:
-PROMO
-PROMOCAO
-CUPOM
-QUEDA
-BC
-CASHBACK`
+          `Linha ${line}: o tipo "${tipoOriginal}" não é válido. Use apenas: PROMO, PROMOCAO, CUPOM, QUEDA, BC, CASHBACK, SOMA ou NADA.`
         );
       }
     }
@@ -758,7 +750,7 @@ CASHBACK`
           });
 
           await page.setContent(html, {
-            waitUntil: "load",
+            waitUntil: "domcontentloaded",
             timeout: 60000,
           });
 
